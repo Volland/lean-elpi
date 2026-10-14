@@ -1,0 +1,8 @@
+% Conformance: strings.
+% Exercises: elpi-core-engine › Core builtins.
+main :-
+  S is "foo" ^ "bar", print S,
+  N is size "hello", print N,
+  print "a" 1 "b",
+  T is substring "hello" 1 3, print T,
+  term_to_string [1,2] U, print U.

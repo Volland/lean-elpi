@@ -1,15 +1,24 @@
 /-!
 # Standard library
 
-Clean-room `std` library; ELPI source lives in `lib/elpi/std.elpi`.
-
-Skeleton only: no requirement is implemented here yet. When code lands, add an
-`implements` annotation naming the OpenSpec requirement above the declaration that
-realizes it (see `tg.md/code-ontology.md`).
+The clean-room `std` library and the builtin prelude, embedded in the compiled artefact
+with `include_str` so binaries need no `lib/elpi/` directory on disk.
 -/
 
 -- @lat: [[components#Standard library]]
 
-namespace Elpi.Std.Std
+namespace Elpi.Std
 
-end Elpi.Std.Std
+/-- Types of control constructs and core builtins. -/
+def builtinSource : String := include_str "../../lib/elpi/builtin.elpi"
+
+/-- The ELPI-side standard library (`std.*`). -/
+-- @tg: implements:: [[openspec:elpi-libraries#Standard library]]
+def source : String := include_str "../../lib/elpi/std.elpi"
+
+/-- Libraries embedded in the binary, by accumulate name. -/
+-- @tg: implements:: [[openspec:elpi-libraries#Embedded libraries]]
+def embedded : List (String × String) :=
+  [("std", source), ("builtin", builtinSource)]
+
+end Elpi.Std

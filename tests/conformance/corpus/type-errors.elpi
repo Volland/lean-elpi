@@ -1,0 +1,7 @@
+% Conformance: an ill-typed program is rejected at load time (both engines fail with
+% an empty standard output and a non-zero status).
+% Exercises: elpi-typechecker › Load-time type errors with positions.
+pred p i:int.
+p "x".
+
+main :- print "unreachable".

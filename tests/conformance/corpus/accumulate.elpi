@@ -1,0 +1,6 @@
+% Conformance: an accumulated unit is loaded once.
+% Exercises: elpi-core-engine › Accumulate and namespaces.
+accumulate lib/mid.
+accumulate lib/leaf.
+
+main :- std.findall (leaf X_) L, print L, std.findall (mid Y_) M, print M.

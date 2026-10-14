@@ -1,0 +1,10 @@
+% Conformance: higher-order pattern unification.
+% Exercises: elpi-core-engine › Higher-order pattern unification.
+kind t type.
+type f t -> t -> t.
+type g t -> t.
+
+main :-
+  (pi a\ pi b\ X a b = f b a, print X),
+  (X1 = g X1, print "cyclic" ; print "occurs check"),
+  (pi a\ pi b\ Z_ a = f b a, print "unreachable" ; print "out of scope").

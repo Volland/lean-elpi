@@ -1,4 +1,3 @@
-import Elpi.Cli.Main
 import Elpi.Core.Builtins
 import Elpi.Core.CHR
 import Elpi.Core.Constraints

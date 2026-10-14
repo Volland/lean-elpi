@@ -1,8 +1,9 @@
-## Purpose
+# elpi-core-engine Specification
 
+## Purpose
 The native Lean 4 engine that runs ELPI 1.18 programs: term representation, higher-order pattern unification, hereditary Harrop goal solving, control (cut, spilling, depth-first search), program structure (grafting, accumulate, namespaces, indexing) and core builtins, with the same answers in the same order as the upstream `elpi` 1.18 oracle.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Term representation
 The engine SHALL represent λProlog terms as constants, bound variables, applications, λ-abstractions, unification variables, literals (integers, floats, strings) and opaque builtin data. Bound variables SHALL be encoded as de Bruijn levels, so that a term built under a binder can be reused under further binders without index shifting, and α-equivalent terms SHALL be structurally equal. Every unification variable SHALL record the scope level (the number of enclosing `pi` eigenvariables) at which it was created, and the engine SHALL never assign it a term that mentions an eigenvariable introduced at a deeper level.
@@ -145,7 +146,7 @@ The engine core SHALL be parametric in a host monad `m` that provides `save : m 
 - **THEN** after backtracking into the second branch `?m` is unassigned again and the query succeeds
 
 ### Requirement: Core builtins
-The engine SHALL provide the ELPI 1.18 core builtins with the oracle's behaviour as reference, including at least: `is` with integer and float arithmetic (`+`, `-`, `*`, `/`, `div`, `mod`, `abs`, `min`, `max`, conversions) and string concatenation `^`; comparisons `<`, `>`, `=<`, `>=`, `==`; control `fail`, `not`, `true`; I/O `print`, `term_to_string` and `halt`; string operations `size`, `substring`, `int_to_string`, `rex_match`; and type tests `var`, `name`. Evaluating `is` on an expression containing an unassigned variable or ill-typed operands SHALL raise a runtime error, not fail silently.
+The engine SHALL provide the ELPI 1.18 core builtins with the oracle's behaviour as reference, including at least: `is` with integer and float arithmetic (`+`, `-`, `*`, `/`, `div`, `mod`, `abs`, `min`, `max`, conversions) and string concatenation `^`; comparisons `<`, `>`, `=<`, `>=`, `==`; control `fail`, `not`, `true`; I/O `print`, `term_to_string` and `halt`; string functions `size`, `substring`, `int_to_string`, `string_to_int` (evaluated by `is`, as in the oracle) and the predicates `rex_match` and `rex.match`; and type tests `var`, `name`. Evaluating `is` on an expression containing an unassigned variable or ill-typed operands SHALL raise a runtime error, not fail silently.
 
 #### Scenario: Arithmetic evaluation with is
 - **WHEN** the queries `X is 2 + 3 * 4`, `Y is 7 div 2`, `Z is 7 mod 3` and `W is 2.0 * 1.5` are solved
@@ -153,5 +154,5 @@ The engine SHALL provide the ELPI 1.18 core builtins with the oracle's behaviour
 - **AND** the query `V is U + 1` with `U` unassigned raises a runtime error
 
 #### Scenario: Printing and string builtins
-- **WHEN** the queries `print "a" 1`, `S is "foo" ^ "bar"` and `size "hello" N` are solved
+- **WHEN** the queries `print "a" 1`, `S is "foo" ^ "bar"` and `N is size "hello"` are solved
 - **THEN** standard output receives the line `a 1`, and the answers are `S = "foobar"` and `N = 5`, matching the oracle

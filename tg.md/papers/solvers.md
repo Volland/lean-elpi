@@ -147,6 +147,12 @@ A builtin runs in whatever host monad the engine was instantiated at, so the sam
 
 The core is generic over a `Backtrackable` monad ([[decisions#Monad-generic core and packaging]], [[glossary#Host monad]]). A builtin that needs Lean services is written against `MetaM` and is only offered when the engine runs there (scenario "Builtin runs in the host monad"); for example `lean.infer` calls `Meta.inferType`. Choice points capture the host state as a `Meta.SavedState`, so if a builtin assigns a Lean metavariable and the search later backtracks past it, the assignment is rewound too. A builtin must therefore keep all of its effects inside the host monad; writing to an `IO.Ref` or a file escapes backtracking and is the author's responsibility.
 
+### As built in M1
+
+The M1 registry (`Elpi/Solver/Registry.lean`) uses plain Lean functions instead of the `Builtin.det` wrappers sketched above.
+
+An implementation has the type `Array Term → LazyList (Array Term)`, optionally in `IO` or `MetaM`; the effect is read off the declaration's type when `@[elpi_builtin "name" "pred …"]` is applied. The array holds the call's arguments, input positions dereferenced and output positions unassigned. Each element of the returned stream lists the values of the output-mode arguments only, in order, and the machine fills in the full tuple and unifies it with the call, so a builtin never sees the modes. An empty stream is failure; the stream is forced one element ahead, so demanding one solution calls the implementation once. The signature is parsed and typechecked against the prelude when the attribute is applied (a malformed string is an elaboration error), a duplicate name is an error at the second registration, and `Registry.loadIn env src` loads a program that sees exactly the builtins registered in `env`. `Registry.metaBuiltins env` offers the same entries to the engine running in `MetaM`, which is what `lean-elpi --lean-env` does.
+
 ## Tier 3: native constraint handlers
 
 The third tier lets Lean code own a family of constraints and an incremental private state, reacting when constraints are added and when their variables are instantiated.

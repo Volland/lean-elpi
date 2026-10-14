@@ -6,7 +6,7 @@ openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api
 
 One section per module or tool of LeanElpi. Each states what it owns, its source file, and typed edges to the components it depends on, the decisions that shape it and the change that introduces it.
 
-Diagrams of how these fit together are in [[uml]]; the layer view is in [[architecture#Layers]]. Source files exist as a skeleton today. Each module carries a `-- @lat:` comment pointing at its section here, because `tg` resolves links from docs into `.lean` files only in the code-to-doc direction. Modules gain `implements` edges as each requirement is built.
+Diagrams of how these fit together are in [[uml]]; the layer view is in [[architecture#Layers]]. The M1 modules are implemented (see each section); the Lean-integration, constraint and LF modules are still skeletons. Each module carries a `-- @lat:` comment pointing at its section here, because `tg` resolves links from docs into `.lean` files only in the code-to-doc direction. Modules gain `implements` edges as each requirement is built.
 
 ## Term store
 

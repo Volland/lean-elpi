@@ -1,0 +1,10 @@
+% Conformance: namespaces qualify names.
+% Exercises: elpi-core-engine › Accumulate and namespaces.
+namespace foo {
+  pred bar o:int.
+  bar 1.
+  pred baz o:int.
+  baz X :- bar X.
+}
+
+main :- foo.baz X, print X.

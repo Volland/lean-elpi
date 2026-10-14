@@ -1,0 +1,9 @@
+% Conformance: spilled calls run before the enclosing goal, left to right.
+% Exercises: elpi-core-engine › Spilling.
+pred succ i:int, o:int.
+succ X Y :- Y is X + 1.
+
+pred show2 i:int, i:int.
+show2 A B :- print A B.
+
+main :- show2 {succ 1} {succ {succ 10}}.

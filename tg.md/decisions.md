@@ -248,3 +248,29 @@ Totality checking emits a Lean theorem only together with a kernel-checked proof
 - status:: proposed
 - motivated_by:: [[constraints#Kernel is the trust anchor]]
 - motivated_by:: [[decisions#LF as the dependent extension]]
+
+## Oracle wins over spec examples
+
+Where a scenario in the M1 specs disagrees with what the ELPI 1.18 oracle does, the implementation follows the oracle and the difference is recorded, because every requirement says the oracle is the reference.
+
+**Context.** Black-box runs while building M1 showed three scenarios that the oracle contradicts: `std.append X Y [1, 2]` has no solutions (the first two arguments are inputs), `size "hello" N` is a type error (`size` and `substring` are functions evaluated by `is`, as are `int_to_string`, `string_to_int` and `real_to_string`), and `/` on two integers and `+` on an integer and a float are runtime errors. Warnings and type errors are printed by the oracle on standard output.
+
+**Decision.** Follow the oracle, test the oracle's behaviour in the Lean tests (`std.appendR` provides the all-splits variant), and keep corpus programs warning-free so that output can be compared. The type-error verdict program `type-errors` is compared by exit status only. The one deliberate exception is non-pattern unification: ELPI 1.18 approximates `Y a a = g a`, while the requirement says to suspend it, so LeanElpi suspends and registers `suspended.elpi` in `tests/conformance/divergences.md`.
+
+**Consequences.** The specs under `openspec/changes/add-elpi-core/` still contain the three stale examples; they should be corrected when the change is archived.
+
+- status:: accepted
+- motivated_by:: [[constraints#Oracle is ELPI 1.18]]
+
+## Undeclared constants are an error only where the type is known
+
+An undeclared constant is reported when it is used where a concrete type is expected or as the head of a goal; elsewhere it is treated as implicitly declared, as the oracle (which only warns) and the corpus require.
+
+**Context.** The spec asks for an error on an undeclared constant, yet the oracle accepts `main :- …` and untyped data such as `p a 1.` with warnings only.
+
+**Decision.** A constant with no declaration and no clauses is an error when the surrounding type is not a bare variable (`pred p i:int. p foo.`) or when it heads a goal (`bar X` outside the namespace that defines `foo.bar`). A predicate defined by clauses counts as declared.
+
+**Consequences.** Programs that rely on untyped constants still load; ill-typed uses of declared predicates are rejected at load time with the position.
+
+- status:: accepted
+- motivated_by:: [[decisions#ELPI 1.18 dialect]]

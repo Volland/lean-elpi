@@ -1,0 +1,7 @@
+% Conformance: a problem outside the pattern fragment is suspended by LeanElpi (as the
+% requirement says); ELPI 1.18 approximates it instead. Registered in divergences.md.
+% Exercises: elpi-core-engine › Higher-order pattern unification.
+kind t type.
+type g t -> t.
+
+main :- pi a\ (Y a a = g a, Y = (x\ y\ g y), print Y).

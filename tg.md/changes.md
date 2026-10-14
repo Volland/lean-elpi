@@ -15,7 +15,7 @@ Milestone M1: the core engine, type checker, Lean builtins (T2), runtime library
 
 Capabilities: `elpi-core-engine`, `elpi-typechecker`, `elpi-solver-api` (builtins, registration), `elpi-runtime-library` (queries, loading, builtins), `elpi-libraries` (std, resolution, embedding), `elpi-cli`, `elpi-conformance`. Files: `openspec/changes/add-elpi-core/`.
 
-- status:: proposed
+- status:: implemented
 - milestone:: M1
 
 ## add-elpi-constraints

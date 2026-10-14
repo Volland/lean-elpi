@@ -1,0 +1,11 @@
+% Conformance: std control predicates.
+% Exercises: elpi-libraries › Standard library.
+pred p o:int.
+p 1.
+p 2.
+
+main :-
+  std.findall (p X_) L, print L,
+  std.do! [print "a", print "b"],
+  std.assert! (1 = 1) "never printed",
+  std.mem [1,2] M, print M.

@@ -1,0 +1,9 @@
+% Conformance: arithmetic.
+% Exercises: elpi-core-engine › Core builtins.
+main :-
+  X is 2 + 3 * 4, print X,
+  Y is 7 div 2, print Y,
+  Z is 7 mod 3, print Z,
+  W is 2.0 * 1.5, print W,
+  V is 10 - 4 - 3, print V,
+  (1 < 2, 2 =< 2, 3 > 2, 3 >= 3, print "comparisons").

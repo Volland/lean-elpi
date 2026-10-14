@@ -1,0 +1,7 @@
+% Conformance: prenex polymorphism.
+% Exercises: elpi-typechecker › Prenex polymorphism.
+pred len i:list A, o:int.
+len [] 0.
+len [_|T] N :- len T M, N is M + 1.
+
+main :- len [1, 2] N, len ["a"] M, print N M.

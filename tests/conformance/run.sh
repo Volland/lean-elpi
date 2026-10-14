@@ -9,7 +9,8 @@
 #
 # Environment: ELPI_ORACLE (default: elpi), LEAN_ELPI (default: the lake build
 # output), CONFORMANCE_TIMEOUT seconds per program (default: 20),
-# CONFORMANCE_DIVERGENCES register file (default: divergences.md next to this script).
+# CONFORMANCE_DIVERGENCES register file (default: divergences.md next to this script),
+# CONFORMANCE_CORPUS corpus directory (default: corpus next to this script).
 # @lat: [[components#Conformance harness]]
 set -euo pipefail
 
@@ -21,6 +22,7 @@ oracle="${ELPI_ORACLE:-elpi}"
 lean_elpi="${LEAN_ELPI:-$root/.lake/build/bin/lean-elpi}"
 limit="${CONFORMANCE_TIMEOUT:-20}"
 divergences="${CONFORMANCE_DIVERGENCES:-$here/divergences.md}"
+corpus="${CONFORMANCE_CORPUS:-$here/corpus}"
 mkdir -p "$out"
 
 # @tg: implements:: [[openspec:elpi-conformance#Oracle version pinning]]
@@ -65,6 +67,14 @@ is_registered_divergence() {
 # @tg: implements:: [[openspec:elpi-conformance#Differential answer comparison]] {confidence: partial}
 compare_outputs() {
   local name="$1"
+  # programs named type-errors* are compared by verdict (exit status) only: the two
+  # engines word their type errors differently
+  case "$name" in
+    type-errors*)
+      cmp -s "$out/$name.oracle.status" "$out/$name.lean.status" && return 0
+      echo "exit status: oracle $(cat "$out/$name.oracle.status"), lean-elpi $(cat "$out/$name.lean.status")" >"$out/$name.diff"
+      return 1 ;;
+  esac
   if diff -u <(normalise "$out/$name.oracle") <(normalise "$out/$name.lean") >"$out/$name.diff" \
      && cmp -s "$out/$name.oracle.status" "$out/$name.lean.status"; then
     return 0
@@ -78,11 +88,11 @@ compare_outputs() {
 # @tg: implements:: [[openspec:elpi-conformance#Shared conformance corpus]] {confidence: partial}
 run_corpus() {
   local failed=0 passed=0 known=0 prog name
-  for prog in "$here"/corpus/*.elpi; do
+  for prog in "$corpus"/*.elpi; do
     name="$(basename "$prog" .elpi)"
     run_engine oracle "$prog" "$oracle"
     if [ "$mode" = record ]; then
-      normalise "$out/$name.oracle" >"$here/corpus/$name.expected"
+      normalise "$out/$name.oracle" >"$corpus/$name.expected"
       echo "rec    $name"
       continue
     fi

@@ -3,3 +3,295 @@
 % Predicates keep upstream names and behaviour; see
 % openspec/changes/add-elpi-core/specs/elpi-libraries/spec.md.
 % @lat: [[components#Standard library]]
+
+% ---- control ------------------------------------------------------------
+
+pred std.findall i:prop, o:list prop.
+std.findall P L :- findall_solutions P L.
+
+pred std.assert! i:prop, i:string.
+std.assert! P _ :- P, !.
+std.assert! _ Msg :- std.fatal-error Msg.
+
+pred std.fatal-error i:string.
+std.fatal-error Msg :- print "Fatal error:" Msg, halt.
+
+pred std.ignore-failure! i:prop.
+std.ignore-failure! P :- P, !.
+std.ignore-failure! _.
+
+pred std.do! i:list prop.
+std.do! [].
+std.do! [P|Ps] :- P, !, std.do! Ps.
+
+pred std.spy i:prop.
+std.spy P :- P.
+
+pred std.spy! i:prop.
+std.spy! P :- P, !.
+
+% ---- lists ----------------------------------------------------------------
+
+pred std.length i:list A, o:int.
+std.length L N :- std.length-aux L 0 N.
+
+pred std.length-aux i:list A, i:int, o:int.
+std.length-aux [] N N.
+std.length-aux [_|L] A N :- B is A + 1, std.length-aux L B N.
+
+pred std.append i:list A, i:list A, o:list A.
+std.append [] L L.
+std.append [X|XS] L [X|R] :- std.append XS L R.
+
+pred std.appendR o:list A, o:list A, o:list A.
+std.appendR [] L L.
+std.appendR [X|XS] L [X|R] :- std.appendR XS L R.
+
+pred std.rev i:list A, o:list A.
+std.rev L R :- std.rev-aux L [] R.
+
+pred std.rev-aux i:list A, i:list A, o:list A.
+std.rev-aux [] L L.
+std.rev-aux [X|XS] A R :- std.rev-aux XS [X|A] R.
+
+pred std.last i:list A, o:A.
+std.last [X] X :- !.
+std.last [_|XS] X :- std.last XS X.
+
+pred std.take i:int, i:list A, o:list A.
+std.take 0 _ [] :- !.
+std.take N [X|XS] [X|L] :- N > 0, M is N - 1, std.take M XS L.
+
+pred std.take-last i:int, i:list A, o:list A.
+std.take-last N L R :- std.length L Len, K is Len - N, std.drop K L R.
+
+pred std.drop i:int, i:list A, o:list A.
+std.drop 0 L L :- !.
+std.drop N [_|XS] L :- N > 0, M is N - 1, std.drop M XS L.
+
+pred std.drop-last i:int, i:list A, o:list A.
+std.drop-last N L R :- std.length L Len, K is Len - N, std.take K L R.
+
+pred std.split-at i:int, i:list A, o:list A, o:list A.
+std.split-at 0 L [] L :- !.
+std.split-at N [X|XS] [X|P] S :- N > 0, M is N - 1, std.split-at M XS P S.
+
+pred std.nth i:int, i:list A, o:A.
+std.nth 0 [X|_] X :- !.
+std.nth N [_|XS] R :- N > 0, M is N - 1, std.nth M XS R.
+
+pred std.mem i:list A, o:A.
+std.mem [X|_] X.
+std.mem [_|L] X :- std.mem L X.
+
+pred std.mem! i:list A, o:A.
+std.mem! L X :- std.mem L X, !.
+
+pred std.lookup i:list (pair A B), i:A, o:B.
+std.lookup [pr K V|_] K V.
+std.lookup [_|L] K V :- std.lookup L K V.
+
+pred std.lookup! i:list (pair A B), i:A, o:B.
+std.lookup! L K V :- std.lookup L K V, !.
+
+pred std.exists i:list A, i:(A -> prop).
+std.exists [X|_] P :- P X.
+std.exists [_|L] P :- std.exists L P.
+
+pred std.exists2 i:list A, i:list B, i:(A -> B -> prop).
+std.exists2 [X|_] [Y|_] P :- P X Y.
+std.exists2 [_|L1] [_|L2] P :- std.exists2 L1 L2 P.
+
+pred std.forall i:list A, i:(A -> prop).
+std.forall [] _.
+std.forall [X|L] P :- P X, std.forall L P.
+
+pred std.forall2 i:list A, i:list B, i:(A -> B -> prop).
+std.forall2 [] [] _.
+std.forall2 [X|XS] [Y|YS] P :- P X Y, std.forall2 XS YS P.
+
+pred std.map i:list A, i:(A -> B -> prop), o:list B.
+std.map [] _ [].
+std.map [X|XS] F [Y|YS] :- F X Y, std.map XS F YS.
+
+pred std.map2 i:list A, i:list B, i:(A -> B -> C -> prop), o:list C.
+std.map2 [] [] _ [].
+std.map2 [X|XS] [Y|YS] F [Z|ZS] :- F X Y Z, std.map2 XS YS F ZS.
+
+pred std.map-i i:list A, i:(int -> A -> B -> prop), o:list B.
+std.map-i L F R :- std.map-i-aux 0 L F R.
+
+pred std.map-i-aux i:int, i:list A, i:(int -> A -> B -> prop), o:list B.
+std.map-i-aux _ [] _ [].
+std.map-i-aux N [X|XS] F [Y|YS] :- F N X Y, M is N + 1, std.map-i-aux M XS F YS.
+
+pred std.filter i:list A, i:(A -> prop), o:list A.
+std.filter [] _ [].
+std.filter [X|XS] P [X|L] :- P X, !, std.filter XS P L.
+std.filter [_|XS] P L :- std.filter XS P L.
+
+pred std.map-filter i:list A, i:(A -> B -> prop), o:list B.
+std.map-filter [] _ [].
+std.map-filter [X|XS] F [Y|YS] :- F X Y, !, std.map-filter XS F YS.
+std.map-filter [_|XS] F L :- std.map-filter XS F L.
+
+pred std.fold i:list A, i:B, i:(A -> B -> B -> prop), o:B.
+std.fold [] A _ A.
+std.fold [X|XS] A F R :- F X A A1, std.fold XS A1 F R.
+
+pred std.fold-right i:list A, i:B, i:(A -> B -> B -> prop), o:B.
+std.fold-right [] A _ A.
+std.fold-right [X|XS] A F R :- std.fold-right XS A F R1, F X R1 R.
+
+pred std.fold2 i:list A, i:list B, i:C, i:(A -> B -> C -> C -> prop), o:C.
+std.fold2 [] [] A _ A.
+std.fold2 [X|XS] [Y|YS] A F R :- F X Y A A1, std.fold2 XS YS A1 F R.
+
+pred std.zip i:list A, i:list B, o:list (pair A B).
+std.zip [] [] [].
+std.zip [X|XS] [Y|YS] [pr X Y|L] :- std.zip XS YS L.
+
+pred std.unzip i:list (pair A B), o:list A, o:list B.
+std.unzip [] [] [].
+std.unzip [pr X Y|L] [X|XS] [Y|YS] :- std.unzip L XS YS.
+
+pred std.flatten i:list (list A), o:list A.
+std.flatten [] [].
+std.flatten [L|LS] R :- std.flatten LS R1, std.append L R1 R.
+
+pred std.iota i:int, o:list int.
+std.iota N L :- std.iota-aux 0 N L.
+
+pred std.iota-aux i:int, i:int, o:list int.
+std.iota-aux N N [] :- !.
+std.iota-aux I N [I|L] :- J is I + 1, std.iota-aux J N L.
+
+pred std.null i:list A.
+std.null [].
+
+pred std.omap i:option A, i:(A -> B -> prop), o:option B.
+std.omap none _ none.
+std.omap (some X) F (some Y) :- F X Y.
+
+pred std.max i:A, i:A, o:A.
+std.max X Y Z :- Z is max X Y.
+
+pred std.intersperse i:A, i:list A, o:list A.
+std.intersperse _ [] [].
+std.intersperse _ [X] [X] :- !.
+std.intersperse S [X|XS] [X,S|R] :- std.intersperse S XS R.
+
+pred std.string.concat i:string, i:list string, o:string.
+std.string.concat _ [] "".
+std.string.concat _ [S] S :- !.
+std.string.concat Sep [S|SS] R :- std.string.concat Sep SS R1, R is S ^ Sep ^ R1.
+
+% ---- ordered maps (unbalanced binary trees) -------------------------------
+
+kind cmp type.
+type lt, eq, gt cmp.
+kind unit type.
+type unit unit.
+kind std.map type -> type -> type.
+type std.map.node std.map K V -> K -> V -> std.map K V -> std.map K V.
+type std.map.leaf std.map K V.
+kind std.map.t type -> type -> type.
+type std.map.map (K -> K -> cmp -> prop) -> std.map K V -> std.map.t K V.
+
+pred cmp_term i:A, i:A, o:cmp.
+cmp_term X Y lt :- X < Y, !.
+cmp_term X Y eq :- X == Y, !.
+cmp_term _ _ gt.
+
+pred std.map.make i:(K -> K -> cmp -> prop), o:std.map.t K V.
+std.map.make Cmp (std.map.map Cmp std.map.leaf).
+
+pred std.map.add i:K, i:V, i:std.map.t K V, o:std.map.t K V.
+std.map.add K V (std.map.map Cmp T) (std.map.map Cmp T1) :- std.map.private.add Cmp K V T T1.
+
+pred std.map.private.add i:(K -> K -> cmp -> prop), i:K, i:V, i:std.map K V, o:std.map K V.
+std.map.private.add _ K V std.map.leaf (std.map.node std.map.leaf K V std.map.leaf).
+std.map.private.add Cmp K V (std.map.node L K1 V1 R) T :-
+  Cmp K K1 O,
+  std.map.private.add-aux O Cmp K V L K1 V1 R T.
+
+pred std.map.private.add-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:V, i:std.map K V, i:K, i:V, i:std.map K V, o:std.map K V.
+std.map.private.add-aux lt Cmp K V L K1 V1 R (std.map.node L1 K1 V1 R) :- std.map.private.add Cmp K V L L1.
+std.map.private.add-aux eq _ K V L _ _ R (std.map.node L K V R).
+std.map.private.add-aux gt Cmp K V L K1 V1 R (std.map.node L K1 V1 R1) :- std.map.private.add Cmp K V R R1.
+
+pred std.map.find i:K, i:std.map.t K V, o:V.
+std.map.find K (std.map.map Cmp T) V :- std.map.private.find Cmp K T V.
+
+pred std.map.private.find i:(K -> K -> cmp -> prop), i:K, i:std.map K V, o:V.
+std.map.private.find Cmp K (std.map.node L K1 V1 R) V :-
+  Cmp K K1 O,
+  std.map.private.find-aux O Cmp K L V1 R V.
+
+pred std.map.private.find-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:std.map K V, i:V, i:std.map K V, o:V.
+std.map.private.find-aux lt Cmp K L _ _ V :- std.map.private.find Cmp K L V.
+std.map.private.find-aux eq _ _ _ V _ V.
+std.map.private.find-aux gt Cmp K _ _ R V :- std.map.private.find Cmp K R V.
+
+pred std.map.mem i:K, i:std.map.t K V.
+std.map.mem K M :- std.map.find K M _.
+
+pred std.map.bindings i:std.map.t K V, o:list (pair K V).
+std.map.bindings (std.map.map _ T) L :- std.map.private.bindings T L.
+
+pred std.map.private.bindings i:std.map K V, o:list (pair K V).
+std.map.private.bindings std.map.leaf [].
+std.map.private.bindings (std.map.node L K V R) B :-
+  std.map.private.bindings L BL,
+  std.map.private.bindings R BR,
+  std.append BL [pr K V|BR] B.
+
+pred std.map.remove i:K, i:std.map.t K V, o:std.map.t K V.
+std.map.remove K (std.map.map Cmp T) (std.map.map Cmp T1) :-
+  std.map.private.bindings T B,
+  std.map.private.remove-binding Cmp K B B1,
+  std.map.private.rebuild Cmp B1 std.map.leaf T1.
+
+pred std.map.private.remove-binding i:(K -> K -> cmp -> prop), i:K, i:list (pair K V), o:list (pair K V).
+std.map.private.remove-binding _ _ [] [].
+std.map.private.remove-binding Cmp K [pr K1 V1|L] R :-
+  Cmp K K1 O,
+  std.map.private.remove-aux O Cmp K K1 V1 L R.
+
+pred std.map.private.remove-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:K, i:V, i:list (pair K V), o:list (pair K V).
+std.map.private.remove-aux eq _ _ _ _ L L.
+std.map.private.remove-aux lt _ _ K1 V1 L [pr K1 V1|L].
+std.map.private.remove-aux gt Cmp K K1 V1 L [pr K1 V1|R] :- std.map.private.remove-binding Cmp K L R.
+
+pred std.map.private.rebuild i:(K -> K -> cmp -> prop), i:list (pair K V), i:std.map K V, o:std.map K V.
+std.map.private.rebuild _ [] T T.
+std.map.private.rebuild Cmp [pr K V|L] T R :-
+  std.map.private.add Cmp K V T T1,
+  std.map.private.rebuild Cmp L T1 R.
+
+% ---- sets ------------------------------------------------------------------
+
+kind std.set type -> type.
+type std.set.set std.map.t K unit -> std.set K.
+
+pred std.set.make i:(K -> K -> cmp -> prop), o:std.set K.
+std.set.make Cmp (std.set.set M) :- std.map.make Cmp M.
+
+pred std.set.add i:K, i:std.set K, o:std.set K.
+std.set.add K (std.set.set M) (std.set.set M1) :- std.map.add K unit M M1.
+
+pred std.set.mem i:K, i:std.set K.
+std.set.mem K (std.set.set M) :- std.map.find K M _.
+
+pred std.set.elements i:std.set K, o:list K.
+std.set.elements (std.set.set M) L :- std.map.bindings M B, std.set.private.keys B L.
+
+pred std.set.private.keys i:list (pair K unit), o:list K.
+std.set.private.keys [] [].
+std.set.private.keys [pr K _|B] [K|L] :- std.set.private.keys B L.
+
+pred std.set.remove i:K, i:std.set K, o:std.set K.
+std.set.remove K (std.set.set M) (std.set.set M1) :- std.map.remove K M M1.
+
+pred std.set.cardinal i:std.set K, o:int.
+std.set.cardinal S N :- std.set.elements S L, std.length L N.

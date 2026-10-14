@@ -1,0 +1,9 @@
+% Conformance: clause names and grafting.
+% Exercises: elpi-core-engine › Clause names and grafting.
+pred r o:int.
+:name "base" r 1.
+r 3.
+:after "base" r 2.
+:before "base" r 0.
+
+main :- std.findall (r X_) L, print L.

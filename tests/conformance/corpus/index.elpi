@@ -1,0 +1,9 @@
+% Conformance: first-argument indexing never changes the answers.
+% Exercises: elpi-core-engine › First-argument indexing.
+pred p o:string, o:int.
+p "a" 1.
+p "b" 2.
+p X 9 :- X = "b".
+p "c" 3.
+
+main :- std.findall (p "b" X_) L, print L, std.findall (p Y_ Z_) M, print M.

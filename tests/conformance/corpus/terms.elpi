@@ -1,0 +1,11 @@
+% Conformance: unification variables cannot capture later eigenvariables.
+% Exercises: elpi-core-engine › Term representation.
+kind t type.
+type f t -> t.
+type a t.
+
+pred try1.
+try1 :- pi c\ X_ = c, print "captured".
+try1 :- print "scope respected".
+
+main :- try1, (pi c\ pi d\ f c = f d, print "equal" ; print "distinct"), X = (x\ y\ x), Y = (a\ b\ a), X = Y, print "alpha-equivalent".

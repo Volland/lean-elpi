@@ -1,0 +1,7 @@
+% Conformance: std.set.
+% Exercises: elpi-libraries › Standard library.
+main :-
+  std.set.make cmp_term S0, std.set.add 3 S0 S1, std.set.add 1 S1 S2, std.set.add 3 S2 S3,
+  std.set.elements S3 L, print L,
+  (std.set.mem 1 S3, print "yes" ; print "no"),
+  (std.set.mem 2 S3, print "yes" ; print "no").

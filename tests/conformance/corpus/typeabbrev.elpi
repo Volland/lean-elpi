@@ -1,0 +1,8 @@
+% Conformance: type abbreviations expand during checking.
+% Exercises: elpi-typechecker › Type abbreviations.
+typeabbrev env (list (pair string int)).
+pred lookup i:env, i:string, o:int.
+lookup [pr K V|_] K V.
+lookup [_|L] K V :- lookup L K V.
+
+main :- lookup [pr "x" 1, pr "y" 2] "y" V, print V.

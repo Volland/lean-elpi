@@ -1,0 +1,3 @@
+accumulate leaf.
+pred mid o:int.
+mid X :- leaf X.

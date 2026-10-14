@@ -1,0 +1,9 @@
+% Conformance: backtracking undoes bindings.
+% Exercises: elpi-core-engine › Persistent store.
+kind t type.
+type a t.
+
+main :-
+  ((X = 1, _Y = a, fail) ; Z = X),
+  print Z,
+  (X = 5, print X, fail ; print "after").

@@ -1,0 +1,96 @@
+% Types of the control constructs and core builtins of LeanElpi (Apache-2.0).
+% Clean-room: the set of names and types follows the ELPI 1.18 documentation and
+% black-box oracle runs.
+
+kind prop type.
+typeabbrev o prop.
+kind int type.
+kind float type.
+kind string type.
+kind any type.
+kind bool type.
+kind variadic type -> type -> type.
+kind list type -> type.
+kind option type -> type.
+kind pair type -> type -> type.
+
+type [] list A.
+type (::) A -> list A -> list A.
+type some A -> option A.
+type none option A.
+type pr A -> B -> pair A B.
+type tt bool.
+type ff bool.
+
+type true prop.
+type fail prop.
+type ! prop.
+type (,) prop -> prop -> prop.
+type (;) prop -> prop -> prop.
+type (:-) prop -> prop -> prop.
+type (=>) any -> prop -> prop.
+type (->) prop -> prop -> prop.
+type pi (A -> prop) -> prop.
+type sigma (A -> prop) -> prop.
+type not prop -> prop.
+type (=) A -> A -> prop.
+type (==) A -> A -> prop.
+type (is) A -> A -> prop.
+type (<) A -> A -> prop.
+type (>) A -> A -> prop.
+type (=<) A -> A -> prop.
+type (>=) A -> A -> prop.
+type (i<) int -> int -> prop.
+type (i>) int -> int -> prop.
+type (i=<) int -> int -> prop.
+type (i>=) int -> int -> prop.
+type (r<) float -> float -> prop.
+type (r>) float -> float -> prop.
+type (r=<) float -> float -> prop.
+type (r>=) float -> float -> prop.
+type (s<) string -> string -> prop.
+type (s>) string -> string -> prop.
+type (s=<) string -> string -> prop.
+type (s>=) string -> string -> prop.
+
+type (+) A -> A -> A.
+type (-) A -> A -> A.
+type (*) A -> A -> A.
+type (/) A -> A -> A.
+type (^) A -> A -> A.
+type (**) A -> A -> A.
+type (div) int -> int -> int.
+type (mod) int -> int -> int.
+type (r+) float -> float -> float.
+type (r-) float -> float -> float.
+type (r*) float -> float -> float.
+type (i+) int -> int -> int.
+type (i-) int -> int -> int.
+type (i*) int -> int -> int.
+type abs A -> A.
+type min A -> A -> A.
+type max A -> A -> A.
+type (~) A -> A.
+type sqrt float -> float.
+type ln float -> float.
+type sin float -> float.
+type cos float -> float.
+type atan float -> float.
+type int_to_real int -> float.
+type truncate float -> int.
+type floor float -> int.
+type ceil float -> int.
+
+type print variadic any prop.
+pred term_to_string i:A, o:string.
+pred halt.
+type size string -> int.
+type substring string -> int -> int -> string.
+type int_to_string int -> string.
+type string_to_int string -> int.
+type real_to_string float -> string.
+pred rex_match i:string, i:string.
+pred rex.match i:string, i:string.
+pred var i:A.
+pred name i:A.
+pred findall_solutions i:prop, o:list prop.

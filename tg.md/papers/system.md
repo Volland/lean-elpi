@@ -293,16 +293,27 @@ The vocabulary for these edges (`implements`, `verifies`, `motivated_by`, `-cont
 
 ## Status and roadmap
 
-There is no implementation yet: the specs, decisions and these papers are the current deliverable. Work is staged in milestones so that each one yields something usable and testable against the oracle.
+Milestone M1 is implemented: the engine, type checker, runtime library, CLI, standard library and conformance suite exist and pass. Work is staged in milestones so that each one yields something usable and testable against the oracle.
 
 | Milestone | Change | Delivers |
 |---|---|---|
-| M1 | [[changes#add-elpi-core]] | core engine, type checker, Lean builtin API, runtime library, std, CLI, conformance harness |
+| M1 (delivered) | [[changes#add-elpi-core]] | core engine, type checker, Lean builtin API, runtime library, std, CLI, conformance harness |
 | M2 | [[changes#add-elpi-constraints]] | delayed goals, CHR, scoped and residual constraints, native handlers, unification hooks |
 | M3 | [[changes#add-lean-integration]] | Expr reflection, marshalling and `deriving Elpi`, quotations, commands, tactics, Lean builtins, `lean`/`lean.ltac`/`lean.derive` libraries, typed rule DSL |
 | LF | [[changes#add-elpi-lf]] (proposed) | dependent signatures, proof terms, export to inductive families, kernel-checked certificates, search strategies, mode and totality checking |
 
 The staging decision, and the features deliberately deferred (macros, deep and multi-argument `:index`, ELPI 2.x `func` and determinacy checking, the tracing protocol), are in [[decisions#Staged language surface]] and [[overview#Milestones]]. The project targets the Lean toolchain 4.35 without Mathlib ([[constraints#Lean toolchain 4.35]]).
+
+## Delivery in M1
+
+M1 ships four ways to run a program, all on the same engine core.
+
+- **Runtime library.** `Elpi.Program.load` parses, resolves `accumulate` against the embedded libraries, typechecks and compiles a program to an immutable `CompiledProgram`. `Elpi.solve` is a pure function returning a `LazyList` of solutions, `Elpi.solveIO` runs the same machine in `IO`, and `Elpi.solveAs` decodes answer variables into Lean values through `FromElpi`. `assert` and `withBuiltin` return new programs that share structure with the original.
+- **Compiled programs.** `elpi_program foo "…"` runs the pipeline at elaboration time and stores the lowered clauses as plain data (`ToExpr`), so `foo.compiled` is rebuilt without any parsing; `elpi_main foo` makes it an executable.
+- **CLI.** `lean-elpi FILE… [-test | -exec P -- ARGS] [-I DIR] [--lean-env M1,M2] [--fuel N]`, or a REPL. With `--lean-env` the registered Lean builtins run in `MetaM` ([[decisions#Monad-generic core and packaging]]).
+- **Libraries.** `lib/elpi/builtin.elpi` (types of the control constructs and builtins) and `lib/elpi/std.elpi` are written clean-room and embedded with `include_str`; the resolver searches the accumulating file's directory, `-I` paths, the package's `lib/elpi/`, the dependencies' `lib/elpi/` in manifest order, then the embedded copies.
+
+The conformance harness (`lake run conformance`) runs the corpus under the ELPI 1.18 oracle and under `lean-elpi` and compares output and exit status. Its findings so far are recorded rather than hidden: the oracle approximates non-pattern unification where the spec suspends, it declares `std.append`'s first two arguments as inputs, and `size`/`substring` are evaluable functions rather than predicates ([[decisions#Oracle wins over spec examples]]).
 
 ## Related work
 

@@ -1,0 +1,26 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Install the ELPI 1.18 oracle
+        run: |
+          sudo apt-get update && sudo apt-get install -y opam
+          opam init --yes --disable-sandboxing
+          scripts/install-oracle.sh
+      - name: Build
+        run: lake build
+      - name: Core must not import Lean.Meta / Lean.Elab
+        run: scripts/check-core-imports.sh
+      - name: Tests
+        run: lake test
+      - name: Differential conformance against the oracle
+        run: |
+          eval "$(opam env --switch=lean-elpi-oracle)"
+          lake run conformance

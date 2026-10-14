@@ -1,5 +1,5 @@
 ---
-openspec: [elpi-core-engine, elpi-constraints]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints]
 ---
 # A Persistent Abstract Machine for Lambda Prolog
 
@@ -381,3 +381,15 @@ Optimisations planned behind the `Store` interface, in rough order:
 5. **Benchmarks from the conformance corpus**, run against the oracle for timing as well as answers.
 
 Because the machine talks to the substitution only through the `Store` interface, each of these can land without touching resolution, cut or constraints, and the oracle keeps every step honest.
+
+## As built in M1
+
+The M1 engine follows the design above with a handful of concrete choices worth knowing when reading the code in `Elpi/Core/`.
+
+**Terms.** `Term` has one constructor beyond the design, `cvar i args`, a clause-level variable. A stored clause is closed over its `cvar`s and over its own binders; selecting the clause at depth `d` renames every `cvar` to a fresh unification variable at level `d` and moves every bound level by `d` (`Machine.rename`). Because levels are absolute, `shiftUp` (the "move" of the design) is the only relocation primitive: it is used when an assigned variable is dereferenced deeper than its level, when a λ is η-expanded, and when a local clause is used deeper than where it was added. Substitution of a level lowers the levels above it and re-normalises applications, so terms stay β-normal.
+
+**Unification.** `Unify.loop` is a tail-recursive worklist over pairs of terms, so unifying two 10^6-element lists does not grow the native stack. Flex–rigid problems go through `inv`, which maps the pattern spine to the binders of the abstraction, keeps levels below the variable's, fails on any other eigenvariable and prunes variables met on the way (`Y` becomes `Y'` at the lower level with only the surviving arguments). Out-of-fragment problems are pushed to `Store.delayed` and re-examined once, when the goal stack is empty; ELPI 1.18 instead approximates such problems, which is the one registered divergence (`tests/conformance/divergences.md`).
+
+**Machine.** A frame carries its goal, depth, hypothetical clauses and cut barrier. Hypothetical clauses added by `=>` are tried before the static ones, newest group first, as in the oracle. A choice point keeps the store, the continuation and the host snapshot; `not G` is `(G, !, fail) ; true` with the cut local to the construct; `findall_solutions` runs a nested machine over the current store and copies the instances out with fresh variables.
+
+**Answers.** The machine returns `Step.yield` with the final store and a resumable machine whose `resume` flag makes the next step backtrack. `Elpi.solve` unfolds this into a `LazyList` in `Id`; `solveIO` and `runIn` run the same loop in `IO` or any `Backtrackable` monad.

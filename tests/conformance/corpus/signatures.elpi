@@ -1,0 +1,11 @@
+% Conformance: kind and type declarations are accepted.
+% Exercises: elpi-typechecker › Signature declarations.
+kind nat type.
+type z nat.
+type s nat -> nat.
+
+pred even i:nat.
+even z.
+even (s (s N)) :- even N.
+
+main :- even (s (s z)), (even (s z), print "bad" ; print "odd").

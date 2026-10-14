@@ -1,0 +1,16 @@
+% Conformance: std list predicates.
+% Exercises: elpi-libraries › Standard library.
+main :-
+  std.append [1] [2] L, print L,
+  std.rev [1,2,3] R, print R,
+  std.length ["a","b","c"] N, print N,
+  std.nth 1 ["x","y","z"] E, print E,
+  std.split-at 1 [1,2,3] P Q, print P Q,
+  std.zip [1,2] ["a","b"] Z, print Z,
+  std.flatten [[1],[2,3]] F, print F,
+  std.filter [1,2,3,4] (x\ x > 2) G, print G,
+  std.fold [1,2,3] 0 (x\ a\ r\ r is a + x) S, print S,
+  std.map [1,2] (x\ y\ y is x * 2) H, print H,
+  std.last [1,2,3] La, print La,
+  std.take 2 [1,2,3] T, print T,
+  std.drop 2 [1,2,3] D, print D.

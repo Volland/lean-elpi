@@ -1,0 +1,10 @@
+% Conformance: pi, implication and disjunction.
+% Exercises: elpi-core-engine › Hereditary Harrop goals.
+pred q o:int.
+
+main :-
+  (pi x\ x = x, print "x = x"),
+  (pi x\ pi y\ x = y, print "bad" ; print "x != y"),
+  (q 1 => q X, print X),
+  (q Y_, print "leaked" ; print "scoped"),
+  ((Z = 1 ; Z = 2), Z > 1, print Z).

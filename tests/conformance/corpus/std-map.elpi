@@ -1,0 +1,7 @@
+% Conformance: std.map.
+% Exercises: elpi-libraries › Standard library.
+main :-
+  std.map.make cmp_term M0, std.map.add 1 "a" M0 M1, std.map.add 2 "b" M1 M2,
+  std.map.find 1 M2 V, print V,
+  (std.map.find 3 M2 W, print W ; print "no key 3"),
+  std.map.bindings M2 B, print B.

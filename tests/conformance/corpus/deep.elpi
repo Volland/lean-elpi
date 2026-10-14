@@ -1,0 +1,7 @@
+% Conformance: deep recursion does not overflow the stack.
+% Exercises: elpi-core-engine › Abstract machine.
+pred count i:int.
+count 0.
+count N :- N > 0, M is N - 1, count M.
+
+main :- count 1000000, print "counted".

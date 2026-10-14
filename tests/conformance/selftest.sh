@@ -70,7 +70,7 @@ test_unexpected_oracle_version_is_reported() {
 # @tg: verifies:: [[openspec:elpi-conformance#Known divergence register#Registered divergence does not fail the suite]]
 test_registered_divergence_does_not_fail() {
   local log status ok=yes
-  log="$(LEAN_ELPI="$tmp/reversing" CONFORMANCE_DIVERGENCES="$tmp/append-divergence.md" "$run" 2>&1)"; status=$?
+  log="$(LEAN_ELPI="$tmp/reversing" CONFORMANCE_CORPUS="$here/fixtures/corpus" CONFORMANCE_DIVERGENCES="$here/fixtures/divergences.md" "$run" 2>&1)"; status=$?
   echo "$log" | grep -q '^known  append (registered divergence)$' || ok=no
   # Only append prints more than one line, so it is the only program the
   # reversing engine changes; with its entry registered nothing may fail.

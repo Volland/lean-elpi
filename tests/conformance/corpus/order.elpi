@@ -1,0 +1,12 @@
+% Conformance: answers follow clause order.
+% Exercises: elpi-core-engine › Depth-first search order.
+pred p o:int.
+p 1.
+p 2.
+p 3.
+
+pred q o:int.
+q X :- p X.
+q 0.
+
+main :- std.findall (q X_) L, print L.
