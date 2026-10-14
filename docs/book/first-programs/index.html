@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms, clauses and search · LeanElpi</title>
+<meta name="description" content="Facts, rules, unification, backtracking, cut and arithmetic.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/" aria-current=page>Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="terms-clauses-and-search">Terms, clauses and search</h1>
+<p>If you know Prolog, this chapter is a quick refresher with ELPI's syntax. If you do not, it is all you need to read programs in the rest of the book.</p>
+<h2 id="facts-and-rules">Facts and rules</h2>
+<p>A program is a list of <strong>clauses</strong>. A clause <code>head :- body.</code> says: to prove <code>head</code>, prove <code>body</code>. A clause with no body is a <strong>fact</strong>.</p>
+<pre><code class="language-elpi">kind person type.
+type ann, bob, carl person.
+
+pred parent o:person, o:person.
+parent ann bob.
+parent bob carl.
+
+pred ancestor o:person, o:person.
+ancestor X Y :- parent X Y.
+ancestor X Z :- parent X Y, ancestor Y Z.</code></pre>
+<p>Names starting with an uppercase letter (<code>X</code>, <code>Y</code>) are <strong>unification variables</strong>. Lowercase names (<code>ann</code>, <code>parent</code>) are constants. A comma means "and", a semicolon means "or".</p>
+<h2 id="queries-and-backtracking">Queries and backtracking</h2>
+<p>A query is a goal. The engine tries the clauses of a predicate in order, top to bottom. If a clause leads to failure, it <strong>backtracks</strong> to the most recent choice and tries the next clause. Asking <code>ancestor ann X</code> yields <code>X = bob</code>; asking for more yields <code>X = carl</code>.</p>
+<p>LeanElpi explores in this fixed depth-first order. The answers come back as a lazy stream, so you pay only for the answers you look at.</p>
+<h2 id="unification">Unification</h2>
+<p>Unification makes two terms equal by assigning variables. <code>parent ann X</code> matches the fact <code>parent ann bob</code> by assigning <code>X := bob</code>. Terms are built from constants, applications such as <code>app M N</code>, lists <code>[1, 2, 3]</code> (with <code>[H|T]</code> for head and tail), numbers, strings, and λ-abstractions, which the next chapter explains.</p>
+<h2 id="lists-and-recursion">Lists and recursion</h2>
+<pre><code class="language-elpi">pred append i:list A, i:list A, o:list A.
+append [] L L.
+append [X|Xs] L [X|R] :- append Xs L R.
+
+main :- append [1,2] [3] L, print L.</code></pre>
+<p>Running this prints <code>[1, 2, 3]</code>. The <code>A</code> in <code>list A</code> is a type variable, so <code>append</code> works on lists of anything.</p>
+<h2 id="arithmetic-and-comparison">Arithmetic and comparison</h2>
+<p><code>is</code> evaluates an arithmetic expression:</p>
+<pre><code class="language-elpi">pred len i:list A, o:int.
+len [] 0.
+len [_|T] N :- len T M, N is M + 1.</code></pre>
+<p>Comparisons such as <code>X &gt;= Y</code> and <code>X &lt; Y</code> are goals that succeed or fail.</p>
+<h2 id="cut">Cut</h2>
+<p>The cut <code>!</code> commits to the current clause: it discards the remaining clauses of the predicate and the choice points created so far in the body.</p>
+<pre><code class="language-elpi">pred max i:int, i:int, o:int.
+max X Y X :- X &gt;= Y, !.
+max _ Y Y.</code></pre>
+<p><code>max 3 7 M</code> gives <code>M = 7</code>: the first clause fails at <code>3 &gt;= 7</code>, so the second applies. Use cut sparingly; modes (chapter on types) often express the same intent more clearly.</p>
+<h2 id="printing-and-main">Printing and <code>main</code></h2>
+<p><code>print</code> writes its arguments to the output. The predicate <code>main</code> is the conventional entry point when you run a file with <code>-test</code>:</p>
+<pre><code class="language-elpi">main :- ancestor ann carl, print &quot;ann is an ancestor of carl&quot;.</code></pre></article><nav class="pager"><a href="/lean-elpi/book/getting-started/">← Getting started</a><a href="/lean-elpi/book/higher-order/">Higher-order programming →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

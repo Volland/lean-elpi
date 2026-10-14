@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Constraints and CHR · LeanElpi</title>
+<meta name="description" content="Delayed goals, suspended unification, and constraint handling rules.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/" aria-current=page>Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="constraints-and-chr">Constraints and CHR</h1>
+<p>Some goals cannot run yet because they depend on a variable that is still unknown. LeanElpi can <strong>delay</strong> such goals and wake them when the variable is assigned.</p>
+<h2 id="delayed-goals">Delayed goals</h2>
+<pre><code class="language-elpi">pred even i:int.
+even N :- 0 is N mod 2, print &quot;even&quot; N.
+
+main :-
+  declare_constraint (even X) [X],
+  print &quot;after&quot;,
+  X = 4.</code></pre>
+<p><code>declare_constraint G [X]</code> suspends <code>G</code> on the variable <code>X</code>. The program prints <code>after</code> first. When <code>X = 4</code> assigns the variable, <code>even 4</code> runs at once, in order, and prints <code>even 4</code>. If a woken goal fails, the assignment fails and the engine backtracks, so suspended goals are real constraints, not comments.</p>
+<p>The constraint store is part of the persistent state, so backtracking undoes suspensions as well.</p>
+<h2 id="constraint-handling-rules">Constraint Handling Rules</h2>
+<p>A <strong>CHR</strong> program rewrites the store of constraints. Here is a solver for <code>≤</code> that collapses cycles:</p>
+<pre><code class="language-elpi">constraint leq {
+  rule \ (leq X X).
+  rule (leq X Y) \ (leq X Y).
+  rule (leq X Y) \ (leq Y X) &lt;=&gt; (X = Y).
+  rule (leq X Y) (leq Y Z) &lt;=&gt; (leq X Z).
+}
+
+pred leq o:int, o:int.
+leq A B :- declare_constraint (leq A B) [A, B].
+
+main :- leq A B, leq B C, leq C A, print A B C.</code></pre>
+<p>The rules mean, in order: reflexivity is dropped; duplicates are dropped; antisymmetry unifies; transitivity adds the composed constraint. Posting <code>leq A B</code>, <code>leq B C</code>, <code>leq C A</code> forms a cycle, so the solver unifies all three variables.</p>
+<h2 id="solver-tiers">Solver tiers</h2>
+<p>LeanElpi offers four ways to extend the engine with a solver. Pick the lowest tier that works.</p>
+<table><thead><tr><th>Tier</th><th>What</th><th>Use it for</th></tr></thead><tbody><tr><td>T1</td><td>CHR solvers written in ELPI</td><td>Declarative constraint solvers</td></tr><tr><td>T2</td><td>Native builtins in Lean</td><td>Deterministic functions, such as <code>lean.infer</code></td></tr><tr><td>T3</td><td>Native constraint handlers</td><td>Solvers that need Lean data structures</td></tr><tr><td>T4</td><td>Unification hooks</td><td>Teaching unification about an interpreted symbol</td></tr></tbody></table>
+<p>T4 is how the LF layer evaluates <code>add 2 3</code> by Lean computation when unification gets stuck on it.</p></article><nav class="pager"><a href="/lean-elpi/book/types-and-modes/">← Types and modes</a><a href="/lean-elpi/book/standalone/">Using it standalone →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started · LeanElpi</title>
+<meta name="description" content="Install LeanElpi and run a first program, standalone and inside Lean.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/" aria-current=page>Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="getting-started">Getting started</h1>
+<p>LeanElpi ships as a Lake package for Lean 4 and as a command-line program. This chapter builds both and runs the same small program three ways.</p>
+<h2 id="build-it">Build it</h2>
+<p>You need <a href="https://lean-lang.org/install/">Lean 4 via elan</a>. The project pins its toolchain in <code>lean-toolchain</code>.</p>
+<pre><code class="language-bash">git clone https://github.com/Volland/lean-elpi
+cd lean-elpi
+lake build</code></pre>
+<p>The build produces the library and the <code>lean-elpi</code> executable at <code>.lake/build/bin/lean-elpi</code>.</p>
+<h2 id="use-it-from-your-own-lake-project">Use it from your own Lake project</h2>
+<p>Add it as a dependency in your <code>lakefile.lean</code>:</p>
+<pre><code class="language-lean">require «lean-elpi» from git &quot;https://github.com/Volland/lean-elpi&quot; @ &quot;v0.1.0&quot;</code></pre>
+<p>Then <code>import Elpi</code> in any Lean file.</p>
+<h2 id="a-first-program">A first program</h2>
+<p>Save this as <code>family.elpi</code>:</p>
+<pre><code class="language-elpi">kind person type.
+type ann, bob, carl person.
+
+pred parent o:person, o:person.
+parent ann bob.
+parent bob carl.
+
+pred ancestor o:person, o:person.
+ancestor X Y :- parent X Y.
+ancestor X Z :- parent X Y, ancestor Y Z.
+
+main :- ancestor ann carl, print &quot;ann is an ancestor of carl&quot;.</code></pre>
+<h3 id="1-as-a-standalone-program">1. As a standalone program</h3>
+<pre><code class="language-bash">.lake/build/bin/lean-elpi family.elpi -test</code></pre>
+<p><code>-test</code> runs the predicate <code>main</code>. You can also run any predicate with <code>-exec</code>, or start the interactive loop by giving no query:</p>
+<pre><code class="language-bash">printf &#x27;ancestor ann X.\n&#x27; | .lake/build/bin/lean-elpi family.elpi</code></pre>
+<p>The REPL prints each answer and asks whether you want more.</p>
+<h3 id="2-inside-lean">2. Inside Lean</h3>
+<pre><code class="language-lean">import Elpi
+open Elpi.Cmd
+
+elpi_program family
+elpi_accumulate family lp%{
+  kind person type.
+  type ann, bob, carl person.
+  pred parent o:person, o:person.
+  parent ann bob.
+  parent bob carl.
+  pred ancestor o:person, o:person.
+  ancestor X Y :- parent X Y.
+  ancestor X Z :- parent X Y, ancestor Y Z.
+}%
+
+#elpi family lp%{ ancestor ann X }%</code></pre>
+<p>Lean prints <code>X = bob</code>. The block <code>lp%{ … }%</code> holds raw ELPI source; errors inside it are reported at the right line of your Lean file. <code>#elpi</code> shows one answer by default; set <code>elpi.solutions</code> to see more.</p>
+<h3 id="3-as-a-library">3. As a library</h3>
+<pre><code class="language-lean">import Elpi
+open Elpi
+
+#eval show IO Unit from do
+  match Program.load &quot;p 1. p 2.&quot; with
+  | .ok prog =&gt;
+    for r in (solve prog &quot;p X&quot;).toList do
+      match r with
+      | .ok s =&gt; IO.println s
+      | .error e =&gt; IO.println s!&quot;{e}&quot;
+  | .error e =&gt; IO.println s!&quot;{e}&quot;</code></pre>
+<p><code>solve</code> returns a lazy stream of answers, so asking for the first one costs only the first one. This prints <code>X = 1</code> and <code>X = 2</code>.</p>
+<h2 id="what-next">What next</h2>
+<p>The next chapters teach the language from the ground up. If you already know Prolog, skim <a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a> and go straight to <a href="/lean-elpi/book/higher-order/">Higher-order programming</a>.</p></article><nav class="pager"><a href="/lean-elpi/book/why-lambda-prolog/">← Why λProlog</a><a href="/lean-elpi/book/first-programs/">Terms, clauses and search →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

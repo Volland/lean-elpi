@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Announcing LeanElpi 0.1 · LeanElpi</title>
+<meta name="description" content="The first release: an ELPI engine in Lean with constraints, Lean integration and kernel-checked LF proof search.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/">Book</a><a href="/lean-elpi/blog/" aria-current=page>Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+
+<article><p class=meta><time>2026-10-14</time> · Volodymyr Pavlyshyn</p><h1 id="announcing-leanelpi-0-1">Announcing LeanElpi 0.1</h1>
+<p>Today we publish the first release of LeanElpi, a clean-room implementation of the ELPI dialect of λProlog in Lean 4.</p>
+<h2 id="what-is-in-0-1">What is in 0.1</h2>
+<ul><li><strong>The engine</strong>: typed clauses, backtracking, <code>pi</code> and <code>=&gt;</code> goals, higher-order pattern unification, modes, a standard library, a command-line tool and a lazy library API.</li><li><strong>Constraints</strong>: delayed goals, a backtrackable constraint store and CHR, with native handlers and unification hooks for extensions.</li><li><strong>Lean integration</strong>: expression reflection, quotations, tactics and commands written in λProlog, <code>deriving Elpi</code>, and a small DSL for rules.</li><li><strong>The LF layer</strong>: dependently typed signatures, proof terms for every answer, export to Lean inductives, kernel-checked certificates, search strategies, mode and totality checking, and a bridge to Lean computation.</li></ul>
+<h2 id="try-it">Try it</h2>
+<pre><code class="language-lean">require «lean-elpi» from git &quot;https://github.com/Volland/lean-elpi&quot; @ &quot;v0.1.0&quot;</code></pre>
+<p>Then follow <a href="/lean-elpi/book/getting-started/">Getting started</a>. New to λProlog? The <a href="/lean-elpi/book/">book</a> starts from scratch and explains why higher-order logic matters for <a href="/lean-elpi/book/neuro-symbolic/">neuro-symbolic systems</a>.</p>
+<h2 id="what-to-expect">What to expect</h2>
+<p>This is a first release. The LF exporter has a deliberately small fragment, totality theorems cover one designated argument, and performance has not been tuned. The repository lists these limits, and the conformance suite documents where behaviour differs from upstream ELPI.</p>
+<p>Issues and ideas are welcome on <a href="https://github.com/Volland/lean-elpi/issues">GitHub</a>.</p></article>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

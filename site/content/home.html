@@ -1,0 +1,63 @@
+<div class="home">
+<section class="hero">
+<h1>λProlog, natively in Lean 4</h1>
+<p class="lead">LeanElpi is a clean-room Lean 4 implementation of ELPI, the extended λProlog. Write logic programs over higher-order terms, run them from the command line or inside Lean, and have the Lean kernel check the proofs they find.</p>
+<div class="btns">
+<a class="btn" href="{{BASE}}/book/getting-started/">Get started</a>
+<a class="btn alt" href="{{BASE}}/book/">Read the book</a>
+<a class="btn alt" href="{{BASE}}/blog/architecture/">How it is built</a>
+</div>
+</section>
+
+<section>
+<h2>What it is</h2>
+<div class="grid">
+<div class="card"><h3>A λProlog engine</h3><p>Typed clauses, backtracking search, <code>pi</code> and <code>=&gt;</code> goals, and higher-order pattern unification. The dialect is ELPI 1.18, and the answers are compared against the real ELPI on a shared test corpus.</p></div>
+<div class="card"><h3>A Lean metaprogramming tool</h3><p>Declare programs with <code>elpi_program</code>, run them with <code>#elpi</code>, and write tactics and commands in λProlog. Lean expressions are reflected as higher-order terms.</p></div>
+<div class="card"><h3>A certified proof search</h3><p>An opt-in LF layer records a proof term for every answer, exports the signature to Lean inductives, and lets the kernel check the result as a theorem with no extra axioms.</p></div>
+</div>
+</section>
+
+<section>
+<h2>How the solution works</h2>
+<div class="flow">
+<div><b>1 Source</b>ELPI program or <code>#lf</code> signature</div><div class="arrow">→</div>
+<div><b>2 Front end</b>parser and type checker</div><div class="arrow">→</div>
+<div><b>3 Machine</b>explicit abstract machine over a persistent store</div><div class="arrow">→</div>
+<div><b>4 Solvers</b>delayed goals, CHR, native handlers, unification hooks</div><div class="arrow">→</div>
+<div><b>5 Lean</b>reflection, tactics, commands, kernel</div>
+</div>
+<p>The engine is a small interpreter with its state in persistent data structures, so backtracking is just keeping an older version of the state. Unification variables are scoped by de Bruijn levels, which keeps unification inside the decidable pattern fragment. Everything above the engine is optional: use the engine as a library, as a command-line tool, or inside Lean. Read <a href="{{BASE}}/blog/architecture/">the architecture article</a> for the details.</p>
+</section>
+
+<section>
+<h2>A first taste</h2>
+<p>A type checker for the simply typed λ-calculus is four lines of λProlog. Binders are handled by the logic, not by hand-written substitution:</p>
+<pre><code>kind tm type.   kind ty type.
+type app tm -&gt; tm -&gt; tm.     type lam (tm -&gt; tm) -&gt; tm.
+type arr ty -&gt; ty -&gt; ty.     type nat ty.
+
+pred of i:tm, o:ty.
+of (app M N) B :- of M (arr A B), of N A.
+of (lam F) (arr A B) :- pi x\ of x A =&gt; of (F x) B.</code></pre>
+<p>Run it with <code>lean-elpi</code>, or inside Lean with <code>#elpi</code>. The <a href="{{BASE}}/book/getting-started/">getting-started chapter</a> shows both.</p>
+</section>
+
+<section>
+<h2>Three ways to use it</h2>
+<table>
+<thead><tr><th>Mode</th><th>You write</th><th>You get</th></tr></thead>
+<tbody>
+<tr><td>Standalone</td><td><code>lean-elpi program.elpi -test</code></td><td>A λProlog interpreter and REPL</td></tr>
+<tr><td>Library</td><td><code>Program.load</code>, <code>solve</code></td><td>Logic queries from ordinary Lean code</td></tr>
+<tr><td>Inside Lean</td><td><code>elpi_program</code>, <code>#elpi</code>, <code>elpi_tactic</code></td><td>Tactics and commands written in λProlog</td></tr>
+<tr><td>LF layer</td><td><code>lf_signature</code>, <code>lf_certify</code></td><td>Proof search whose results the kernel checks</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>Why higher-order logic</h2>
+<p>Programs, proofs and formulas have binders. A logic language that understands binders can manipulate them safely, and a system that records its derivations can hand them to a trusted checker. That combination is useful whenever a learned component proposes and a symbolic one must verify. The book chapter <a href="{{BASE}}/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a> makes the case.</p>
+</section>
+</div>

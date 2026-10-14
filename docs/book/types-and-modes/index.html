@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Types and modes · LeanElpi</title>
+<meta name="description" content="Declaring kinds, types and predicates, and what input and output modes mean.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/" aria-current=page>Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="types-and-modes">Types and modes</h1>
+<p>ELPI is typed. Types catch most mistakes before a program runs, and they let the engine pick the right overload and print errors early.</p>
+<h2 id="kinds-and-constructors">Kinds and constructors</h2>
+<pre><code class="language-elpi">kind nat type.
+type z nat.
+type s nat -&gt; nat.</code></pre>
+<p><code>kind</code> declares a new type. <code>type</code> declares a constructor or constant with its type. Several constants can share a declaration: <code>type ann, bob, carl person.</code></p>
+<h2 id="predicates-and-modes">Predicates and modes</h2>
+<pre><code class="language-elpi">pred plus i:nat, i:nat, o:nat.
+plus z N N.
+plus (s M) N (s R) :- plus M N R.</code></pre>
+<p><code>pred</code> declares a predicate, its argument types, and a <strong>mode</strong> for each argument:</p>
+<ul><li><code>i:</code> is an <strong>input</strong>: the argument is matched, never assigned. The caller must supply it.</li><li><code>o:</code> is an <strong>output</strong>: the predicate produces it.</li></ul>
+<p>Modes are not just documentation. For an input argument the engine <em>matches</em> the clause head against the call instead of unifying, so a call with a still-unknown input does not silently bind it. They also guide indexing, which makes clause selection fast.</p>
+<p>With these declarations, <code>plus (s (s z)) (s z) R</code> gives <code>R = s (s (s z))</code>.</p>
+<h2 id="polymorphism">Polymorphism</h2>
+<p>Type variables are uppercase. <code>pred append i:list A, i:list A, o:list A.</code> works on any element type. Type checking infers and checks the instances at each use.</p>
+<h2 id="errors-you-will-see">Errors you will see</h2>
+<p>A misuse is reported with a position before anything runs:</p>
+<ul><li><code>unknown type &#x27;tm&#x27;</code>: a type was used before its <code>kind</code> declaration. Declare types first.</li><li><code>application of :: has type (list string) but is used with type string</code>: an argument has the wrong type.</li></ul>
+<h2 id="two-kinds-of-mode">Two kinds of "mode"</h2>
+<p>If you also use the LF layer, note that its <code>#mode</code> directive is a different thing. ELPI's <code>i:</code>/<code>o:</code> changes how the engine runs a predicate. The LF <code>#mode plus +N +M -P</code> is a <em>static</em> check that inputs are ground, and it never changes execution. The <a href="/lean-elpi/book/lf/">LF chapter</a> covers it.</p></article><nav class="pager"><a href="/lean-elpi/book/higher-order/">← Higher-order programming</a><a href="/lean-elpi/book/constraints/">Constraints and CHR →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

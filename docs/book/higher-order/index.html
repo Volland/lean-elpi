@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Higher-order programming · LeanElpi</title>
+<meta name="description" content="Binders as data, pi and implication goals, and pattern unification.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/" aria-current=page>Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="higher-order-programming">Higher-order programming</h1>
+<p>This chapter is the heart of λProlog. Everything here is impossible or painful in plain Prolog.</p>
+<h2 id="terms-with-binders">Terms with binders</h2>
+<p>Suppose we want to represent the λ-calculus. We declare a type of terms and give <code>lam</code> a <strong>function</strong> as its argument:</p>
+<pre><code class="language-elpi">kind tm type.
+type app tm -&gt; tm -&gt; tm.
+type lam (tm -&gt; tm) -&gt; tm.
+type c tm.</code></pre>
+<p>The term <code>lam (x\ app x x)</code> is a λ-term whose body mentions the bound variable <code>x</code> twice. The notation <code>x\ body</code> is ELPI's own λ-abstraction. The argument of <code>lam</code> has type <code>tm -&gt; tm</code>, so the language, not our program, tracks scope. This style is called <strong>higher-order abstract syntax</strong> (HOAS).</p>
+<h2 id="beta-reduction-for-free">Beta reduction for free</h2>
+<p>Applying a bound function substitutes its argument:</p>
+<pre><code class="language-elpi">pred beta i:tm, o:tm.
+beta (app (lam F) A) (F A).</code></pre>
+<p><code>beta (app (lam x\ app x x) c) R</code> gives <code>R = app c c</code>. We wrote no substitution function: <code>F A</code> is an application in the metalanguage, and the engine reduces it.</p>
+<h2 id="going-under-binders-pi">Going under binders: <code>pi</code></h2>
+<p>How do we write a predicate that walks inside a λ? We need a name for the bound variable. The goal <code>pi x\ G</code> runs <code>G</code> with a <strong>fresh constant</strong> <code>x</code> that exists only inside <code>G</code>:</p>
+<pre><code class="language-elpi">pred id i:tm, o:tm.
+id c c.
+id (app A B) (app A&#x27; B&#x27;) :- id A A&#x27;, id B B&#x27;.
+id (lam F) (lam G) :- pi x\ id x x =&gt; id (F x) (G x).</code></pre>
+<p>Read the last clause: to copy <code>lam F</code>, pick a fresh <code>x</code>, <strong>assume</strong> <code>id x x</code>, and copy the body <code>F x</code> into <code>G x</code>. The assumption <code>id x x</code> is a temporary clause that exists only while the goal runs. This is the second new goal form: <code>A =&gt; G</code> adds clause <code>A</code> for the duration of <code>G</code>.</p>
+<p>Running <code>id (lam x\ app x c) S</code> prints <code>S = lam c0 \ app c0 c</code>. Fresh variables are printed as <code>c0</code>, <code>c1</code> and so on.</p>
+<h2 id="type-checking-a-calculus">Type checking a λ-calculus</h2>
+<p>The same two goals give the classic type checker:</p>
+<pre><code class="language-elpi">kind ty type.
+type arr ty -&gt; ty -&gt; ty.
+type nat ty.
+
+pred of i:tm, o:ty.
+of (app M N) B :- of M (arr A B), of N A.
+of (lam F) (arr A B) :- pi x\ of x A =&gt; of (F x) B.</code></pre>
+<p>For <code>lam F</code>, we assume that a fresh <code>x</code> has type <code>A</code>, then check the body. The typing context is the set of assumptions, managed by the engine. There is no explicit environment and no variable-capture bug to write.</p>
+<h2 id="pattern-unification">Pattern unification</h2>
+<p>Higher-order unification is undecidable in general. λProlog programs stay in a decidable fragment called <strong>patterns</strong> (Miller 1991): a variable applied to <em>distinct bound variables</em>, such as <code>F x</code> where <code>x</code> is a fresh <code>pi</code> name. Within it, unification has a most general solution.</p>
+<p>For example, with <code>x</code> fresh, unifying <code>F x = app x x</code> assigns <code>F := y\ app y y</code>. That is how a program decomposes <code>lam F</code> into pieces without ever writing a traversal.</p>
+<p>Outside the fragment (for instance <code>F (app c c) = c</code>, which has several solutions) LeanElpi does not guess. It <strong>suspends</strong> the problem as a delayed goal and keeps going. The <a href="/lean-elpi/book/constraints/">constraints chapter</a> explains what happens then.</p>
+<h2 id="scope-why-names-cannot-escape">Scope: why names cannot escape</h2>
+<p>A variable created outside a <code>pi</code> cannot capture a name created inside it. If you try to bind <code>Y</code> to a fresh <code>x</code> from outside the <code>pi</code>, unification fails, because <code>x</code> is not in the scope of <code>Y</code>. The engine enforces this with de Bruijn <em>levels</em> attached to every unification variable. It is what makes HOAS programs correct by construction.</p></article><nav class="pager"><a href="/lean-elpi/book/first-programs/">← Terms, clauses and search</a><a href="/lean-elpi/book/types-and-modes/">Types and modes →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

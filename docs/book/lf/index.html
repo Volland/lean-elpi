@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certified proof search with LF · LeanElpi</title>
+<meta name="description" content="The LF layer: signatures, proof terms, export to Lean, and kernel-checked certificates.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/" aria-current=page>Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="certified-proof-search-with-lf">Certified proof search with LF</h1>
+<p>The LF layer turns the engine into a proof searcher whose answers the Lean kernel checks. The search engine can be wrong; the certificate cannot be.</p>
+<h2 id="judgments-as-types">Judgments as types</h2>
+<p>In the Edinburgh Logical Framework (LF), a judgment such as "term E has type T" is a <strong>type</strong> <code>of E T</code>, each inference rule is a <strong>constant</strong>, and a derivation is a <strong>term</strong>. So a derivation found by search is an object that can be checked.</p>
+<p>Opt in with a first line <code>#lf</code>. Here is the simply typed λ-calculus:</p>
+<pre><code class="language-elpi">#lf
+tp   : type.
+arr  : tp -&gt; tp -&gt; tp.
+base : tp.
+tm   : type.
+lam  : tp -&gt; (tm -&gt; tm) -&gt; tm.
+app  : tm -&gt; tm -&gt; tm.
+of   : tm -&gt; tp -&gt; type.
+of_lam : of (lam T1 E) (arr T1 T2)
+          &lt;- (pi x:tm\ of x T1 -&gt; of (E x) T2).
+of_app : of (app E1 E2) T2
+          &lt;- of E1 (arr T1 T2)
+          &lt;- of E2 T1.</code></pre>
+<p>Declarations are <code>c : A.</code> Π is <code>pi x:A\ B</code>. <code>A -&gt; B</code> is the arrow, and <code>B &lt;- A</code> means the same thing read backwards. Uppercase variables are implicitly bound and their types are reconstructed. The checker rejects ill-typed signatures with a position, the expected type, and the found type.</p>
+<h2 id="queries-and-proof-terms">Queries and proof terms</h2>
+<pre><code class="language-bash">lean-elpi --lf-proof &#x27;of (lam base x\ x) T&#x27; stlc.elpi</code></pre>
+<pre><code class="language-text">T = arr base base
+proof: of_lam base (x0\ x0) base (x0\ x1\ x1)</code></pre>
+<p>The proof term lists the rule used with its implicit arguments, followed by the proofs of its premises. A hypothetical premise becomes a λ over the new variable and the new hypothesis.</p>
+<p>Inside Lean:</p>
+<pre><code class="language-lean">lf_signature stlc &quot;stlc.elpi&quot;
+#lf_query stlc lp%{ of (lam base x\ x) T }%</code></pre>
+<h2 id="export-and-certificates">Export and certificates</h2>
+<pre><code class="language-lean">lf_export stlc
+lf_certify stlc id_typed lp%{ of (lam base x\ x) (arr base base) }%
+#print axioms id_typed   -- does not depend on any axioms</code></pre>
+<p><code>lf_export</code> generates Lean declarations in the namespace <code>Stlc</code>: an inductive <code>Tp</code>; a scope-indexed <code>Tm : Nat → Type</code> built on a variable type <code>Var</code>; a context <code>Ctx</code>; a lookup relation for hypotheses; and <code>Of : Ctx n → Tm n → Tp → Prop</code> with one constructor per rule. <code>lf_certify</code> runs the query, translates the proof term to a Lean term, and asks the kernel to accept the theorem</p>
+<pre><code class="language-lean">theorem id_typed : Stlc.Of Stlc.Ctx.nil
+  (Stlc.Tm.lam Stlc.Tp.base (Stlc.Tm.var Stlc.Var.zero)) (Stlc.Tp.base.arr Stlc.Tp.base)</code></pre>
+<p>If the kernel rejects a certificate, the command reports its error and adds nothing. Soundness rests on the kernel alone.</p>
+<h2 id="search-strategies">Search strategies</h2>
+<p>By default the search is depth-first. Directives choose another: <code>#strategy bounded 5</code>, or <code>#strategy iddfs</code> for iterative deepening, which finds a proof that depth-first misses when a recursive rule comes first and reports each answer once.</p>
+<h2 id="modes-totality-and-the-bridge">Modes, totality and the bridge</h2>
+<ul><li><code>#mode plus +N +M -P.</code> checks, clause by clause, that inputs are ground when used. A violation names the clause, premise, argument and variable.</li><li><code>#total N (plus N _ _).</code> checks coverage and termination. If the claim passes, <code>lf_export</code> also adds a theorem such as <code>Arith.plus_total : ∀ (N M : Arith.Nat), ∃ P, Arith.Plus N M P</code>, proved by structural induction and checked by the kernel. If a case is missing, you get the missing case, such as <code>plus z M P</code>, and no theorem.</li><li><code>#bridge nat = Nat.</code> and <code>#bridge add : nat -&gt; nat -&gt; nat = Nat.add.</code> let unification discharge <code>same (add 2 3) 5</code> by Lean computation. The exported theorem mentions <code>Nat.add 2 3</code>, so the kernel re-checks the value.</li></ul>
+<h2 id="using-lf-signatures-from-plain-programs">Using LF signatures from plain programs</h2>
+<p>Any <code>#lf</code> file accumulated into a plain program is erased to ordinary ELPI types and clauses (<code>--lf-erase</code> prints the result). Plain programs then call <code>of</code> and get the same answers, without proof terms.</p>
+<h2 id="limits-of-this-release">Limits of this release</h2>
+<p>The exporter covers one assumption family and binders over the family being defined. Totality theorems are built for a single designated argument. Bridged functions return <code>Nat</code>. These are listed in the repository's LF paper.</p></article><nav class="pager"><a href="/lean-elpi/book/inside-lean/">← Using it inside Lean</a><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

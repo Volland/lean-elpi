@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using it inside Lean · LeanElpi</title>
+<meta name="description" content="Programs, queries, quotations, tactics and commands written in λProlog.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/" aria-current=page>Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="using-it-inside-lean">Using it inside Lean</h1>
+<p>With <code>import Elpi</code>, a Lean file can hold ELPI programs, run them, and let them read and build Lean terms.</p>
+<h2 id="programs-and-queries">Programs and queries</h2>
+<pre><code class="language-lean">import Elpi
+open Elpi.Cmd
+
+elpi_program family
+elpi_accumulate family lp%{
+  kind person type.
+  type ann, bob person.
+  pred parent o:person, o:person.
+  parent ann bob.
+}%
+
+#elpi family lp%{ parent ann X }%</code></pre>
+<ul><li><code>elpi_program name</code> declares a program. It also defines a Lean constant <code>name</code>.</li><li><code>elpi_accumulate name lp%{ … }%</code> adds source to it. You can also accumulate a file: <code>elpi_accumulate name file &quot;rules.elpi&quot;</code>.</li><li><code>#elpi name lp%{ query }%</code> runs a query and reports the first solution.</li><li><code>elpi_db name</code> declares a database that several programs can share.</li></ul>
+<p>Programs are compiled when declared, so a type error in the ELPI source is a Lean error at that position.</p>
+<h2 id="lean-terms-inside-prolog">Lean terms inside λProlog</h2>
+<p>Lean expressions are reflected as ELPI terms using higher-order syntax: <code>lam</code>, <code>app</code>, <code>const</code>, <code>sort</code>, <code>lit</code> and so on, where <code>lam</code> holds a function in its body so that binders are handled by the logic. You rarely write these by hand. Use the quotation <code>{{ … }}</code>:</p>
+<pre><code class="language-lean">#elpi family lp%{ X = {{ 1 + 2 }}, print X }%</code></pre>
+<p>Inside <code>{{ … }}</code> you write ordinary Lean syntax. It is elaborated and turned into a term. Inside a quotation, <code>lp:{{ X }}</code> splices an ELPI variable back in, so you can build and take apart Lean terms with patterns.</p>
+<h2 id="builtins-that-talk-to-lean">Builtins that talk to Lean</h2>
+<p>With <code>accumulate lean.</code> a program gets predicates such as <code>lean.infer</code> (type of a term), <code>lean.add_decl</code> (add a declaration), and name and universe helpers. They run in <code>MetaM</code>, so they see your environment.</p>
+<h2 id="tactics">Tactics</h2>
+<p>A tactic is a predicate <code>solve</code> that takes the goal and returns new goals. The combinator library <code>lean.ltac</code> provides <code>then</code>, <code>orelse</code>, <code>intro</code>, <code>exact</code>, <code>apply</code> and <code>assumption</code>:</p>
+<pre><code class="language-lean">elpi_program intro_assume_prog
+elpi_accumulate intro_assume_prog lp%{
+  accumulate lean.ltac.
+  pred solve i:goal, i:list argument, o:list goal.
+  solve G _ Gs :- lean.ltac.then (lean.ltac.intro &quot;h&quot;) lean.ltac.assumption G Gs.
+}%
+elpi_tactic intro_assume := intro_assume_prog
+
+theorem t (p : Prop) : p → p := by elpi intro_assume</code></pre>
+<p>The result is checked by Lean as usual, so a wrong tactic cannot prove a false theorem.</p>
+<h2 id="commands">Commands</h2>
+<p>A command is a predicate <code>main</code> that takes a list of arguments:</p>
+<pre><code class="language-lean">elpi_program cmdprog
+elpi_accumulate cmdprog lp%{
+  accumulate lean.
+  pred main i:list argument.
+  main [trm (const _ _), int I, str S] :-
+    lean.string-&gt;name S N,
+    lean.add_decl (lean.def N {{Nat}} (lit (nat I))).
+}%
+elpi_command mycmd := cmdprog
+elpi_export mycmd
+
+mycmd Nat.succ 3 &quot;answer&quot;
+example : answer = 3 := rfl</code></pre>
+<p><code>elpi_export</code> makes the command available by name, and the arguments are parsed into ELPI data (<code>trm</code>, <code>int</code>, <code>str</code>).</p>
+<h2 id="deriving">Deriving</h2>
+<p><code>deriving Elpi</code> generates the conversions that move your Lean data types in and out of ELPI, including the type declarations. This is how the library call <code>solveAs</code> can return a Lean structure instead of a raw term.</p>
+<h2 id="as-a-plain-library">As a plain library</h2>
+<p>When you do not need <code>MetaM</code>, the engine is a pure Lean library: <code>Program.load</code> compiles a source string, and <code>solve</code> yields a lazy stream of solutions. The rule DSL (<code>elpi_rules</code>) lets you write predicates as Lean declarations and get typed Lean queries back.</p></article><nav class="pager"><a href="/lean-elpi/book/standalone/">← Using it standalone</a><a href="/lean-elpi/book/lf/">Certified proof search with LF →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using it standalone · LeanElpi</title>
+<meta name="description" content="The lean-elpi command, the REPL, include paths, fuel, and ELPI source files.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/" aria-current=page>Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="using-it-standalone">Using it standalone</h1>
+<p>The <code>lean-elpi</code> executable runs ELPI programs without writing any Lean.</p>
+<h2 id="command-line">Command line</h2>
+<pre><code class="language-bash">lean-elpi FILE… [-test] [-exec PRED] [-I DIR] [--lean-env M1,M2] [--fuel N] [-- ARGS]</code></pre>
+<table><thead><tr><th>Option</th><th>Meaning</th></tr></thead><tbody><tr><td><code>-test</code></td><td>Run the predicate <code>main</code></td></tr><tr><td><code>-exec PRED</code></td><td>Run <code>PRED</code>, passing the arguments after <code>--</code> as a list of strings</td></tr><tr><td><code>-I DIR</code></td><td>Add a directory to the include path for <code>accumulate</code></td></tr><tr><td><code>--lean-env M1,M2</code></td><td>Import Lean modules so that builtins they register are available</td></tr><tr><td><code>--fuel N</code></td><td>Limit the number of machine steps, which stops runaway programs</td></tr><tr><td><code>--lf-erase</code></td><td>Print the erasure of an <code>#lf</code> file as plain ELPI</td></tr><tr><td><code>--lf-proof QUERY</code></td><td>Answer an LF query and print the proof terms</td></tr></tbody></table>
+<p>With several files, they are loaded in order into one program. With no <code>-test</code> and no <code>-exec</code>, you get the interactive loop.</p>
+<h2 id="the-repl">The REPL</h2>
+<pre><code class="language-text">$ lean-elpi family.elpi
+?- ancestor ann X.
+Success:
+  X = bob
+More? (y/N) y
+Success:
+  X = carl</code></pre>
+<p>Type a query ending in a dot. Answer <code>y</code> for another solution.</p>
+<h2 id="splitting-programs-into-files">Splitting programs into files</h2>
+<p>Use <code>accumulate</code> to include another file:</p>
+<pre><code class="language-elpi">accumulate helpers.</code></pre>
+<p><code>accumulate helpers.</code> loads <code>helpers.elpi</code>. Names are resolved relative to the including file, then along the <code>-I</code> directories. Each file is loaded at most once. LeanElpi bundles a standard library (<code>std</code>) and the Lean-facing libraries; they are available without any path.</p>
+<h2 id="fuel">Fuel</h2>
+<p>Every machine step spends one unit of fuel. When it runs out the query stops with a resource error instead of looping forever. Raise it with <code>--fuel</code> for heavy searches. The same limit exists in the library API.</p>
+<h2 id="compatibility-with-elpi">Compatibility with ELPI</h2>
+<p>The dialect is ELPI 1.18. A shared corpus of programs runs on both the real ELPI and LeanElpi in CI-style conformance runs and the outputs are compared. Known differences are listed in <code>tests/conformance/divergences.md</code> in the repository, so you can see exactly where the two engines disagree.</p></article><nav class="pager"><a href="/lean-elpi/book/constraints/">← Constraints and CHR</a><a href="/lean-elpi/book/inside-lean/">Using it inside Lean →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

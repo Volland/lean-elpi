@@ -69,3 +69,9 @@ MATCH (c:Concept) OPTIONAL MATCH (x)-[r:references]->(c) WITH c, count(r) AS n W
 ```
 
 Once code exists, `tg cypher --code annotated` adds the `implements` and `verifies` edges from Lean declarations to requirements.
+
+## Documentation site
+
+The public site (home page, a short book on λProlog and LeanElpi, a blog, and the German legal pages) is generated from Markdown in `site/content/` by `site/build.py` into `docs/`, which GitHub Pages serves.
+
+Edit the Markdown, run `python3 site/build.py`, and commit both `site/` and `docs/`. The book's examples were run with the `lean-elpi` binary before they were written down.

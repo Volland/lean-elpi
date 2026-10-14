@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why λProlog · LeanElpi</title>
+<meta name="description" content="What λProlog adds to Prolog, and where ELPI and LeanElpi fit.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/" aria-current=page>Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="why-prolog">Why λProlog</h1>
+<p>Prolog is good at search over first-order data. It is awkward as soon as the data has binders, such as the λ in a λ-term, the ∀ in a formula, or the <code>fun</code> in a Lean expression. λProlog fixes this by making binders part of the language.</p>
+<h2 id="prolog-plus-terms-plus-two-new-goals">Prolog plus λ-terms plus two new goals</h2>
+<p>λProlog extends Prolog in three ways:</p>
+<ol><li><strong>Terms are typed λ-terms.</strong> <code>lam (x\ app x x)</code> is data, and <code>x\ …</code> is a binder the language understands.</li><li><strong>Unification is higher-order.</strong> It can solve <code>F x = app x x</code> for <code>F</code>, which is how a program pulls a term apart under a binder.</li><li><strong>Goals can introduce names and assumptions.</strong> <code>pi x\ G</code> runs <code>G</code> with a fresh name <code>x</code>, and <code>A =&gt; G</code> runs <code>G</code> with the extra clause <code>A</code>.</li></ol>
+<p>With these, a program about a language with binders can borrow the binders of the host language. No de Bruijn indices, no capture-avoiding substitution, no freshness side conditions: the logic does it.</p>
+<h2 id="elpi">ELPI</h2>
+<p>ELPI is an extended, fast implementation of λProlog by the Inria and Coq-Elpi community. It adds modes (<code>i:</code> and <code>o:</code> annotations), constraint handling rules, and a rich standard library. Coq-Elpi uses it to write Coq plugins and tactics.</p>
+<h2 id="leanelpi">LeanElpi</h2>
+<p>LeanElpi is a <strong>clean-room</strong> Lean 4 implementation of the ELPI 1.18 dialect: no upstream code is ported. It exists for three reasons.</p>
+<ul><li><strong>Embedding.</strong> Lean's own metaprogramming is powerful but low-level. A declarative language with binders is a better fit for many tactics and program transformations.</li><li><strong>Trust.</strong> A search engine can be wrong. In Lean, the kernel can check what the engine finds.</li><li><strong>Portability.</strong> The engine is plain Lean, with no foreign code, so it runs wherever Lean does.</li></ul>
+<p>The engine is generic over a backtracking monad. It works as a pure library, from a command-line binary, and inside <code>MetaM</code>.</p>
+<h2 id="what-this-book-covers">What this book covers</h2>
+<ul><li>the language: <a href="/lean-elpi/book/first-programs/">terms and clauses</a>, <a href="/lean-elpi/book/higher-order/">higher-order programming</a>, <a href="/lean-elpi/book/types-and-modes/">types and modes</a>, <a href="/lean-elpi/book/constraints/">constraints</a>;</li><li>the tool: <a href="/lean-elpi/book/standalone/">standalone use</a> and <a href="/lean-elpi/book/inside-lean/">use inside Lean</a>;</li><li>the LF layer: <a href="/lean-elpi/book/lf/">certified proof search</a>;</li><li>the bigger picture: <a href="/lean-elpi/book/neuro-symbolic/">higher-order logic and neuro-symbolic systems</a>.</li></ul></article><nav class="pager"><span></span><a href="/lean-elpi/book/getting-started/">Getting started →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

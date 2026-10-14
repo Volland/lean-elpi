@@ -6,8 +6,7 @@ dialect of λProlog. It embeds in Lean as a metaprogramming tool (commands, tact
 standalone `lean-elpi` binary, and adds an opt-in LF layer with kernel-checked proof
 terms.
 
-**Status: specification phase.** The design is settled and the requirements are written;
-the Lake project is a module skeleton that builds but implements nothing yet.
+**Status:** version 0.1: the engine, constraints, Lean integration and the LF layer are implemented. Documentation site and book: https://volland.github.io/lean-elpi/ (sources in `site/`, built into `docs/` with `python3 site/build.py`).
 
 ## Where to read
 

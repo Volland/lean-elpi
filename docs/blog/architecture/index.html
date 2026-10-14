@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How LeanElpi is built: architecture of a λProlog engine in Lean · LeanElpi</title>
+<meta name="description" content="The layers of LeanElpi, from the term store and the abstract machine to solver tiers, the Lean bridge and the LF certificate pipeline.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/">Book</a><a href="/lean-elpi/blog/" aria-current=page>Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+
+<article><p class=meta><time>2026-10-14</time> · Volodymyr Pavlyshyn</p><h1 id="how-leanelpi-is-built">How LeanElpi is built</h1>
+<p>LeanElpi is a λProlog engine written in Lean 4. It has to do four jobs at once: be a faithful ELPI 1.18, be usable as a plain library, embed in Lean's metaprogramming, and certify proof search with the kernel. This article walks through the design and the reasons behind it.</p>
+<h2 id="the-layers">The layers</h2>
+<pre><code class="language-text"> Lean files            ELPI / #lf source           CLI
+      │                      │                      │
+ Lean integration ── Front end (parser, type checker) ──┐
+ (reflection, tactics,       │                          │
+  commands, builtins)   Abstract machine ── Solver tiers T1–T4
+      │                      │
+      └──── Term store, persistent substitution, constraint store
+                             │
+                    LF layer: checker, proof terms, export, certificates ──► Lean kernel</code></pre>
+<p>Each layer only depends on the ones below. The engine core does not mention <code>MetaM</code>: it is generic over a <code>Backtrackable</code> monad, so the same code runs as a pure function, in <code>IO</code>, or inside Lean's metaprogramming monads.</p>
+<h2 id="terms-and-the-persistent-store">Terms and the persistent store</h2>
+<p>Terms are first-order trees extended with λ and with unification variables. Bound variables use <strong>de Bruijn levels</strong> (counted from the outside), and every unification variable records the level at which it was created. Levels make the scope rule cheap to enforce: a variable may only be assigned a term whose names are all older than the variable.</p>
+<p>The substitution lives in a <strong>persistent store</strong>. Assigning a variable produces a new store and leaves the old one intact. Backtracking, which is the hot operation in logic programming, is then "go back to the store you saved", with no trail to unwind and no undo bugs. The same store holds the constraint store, so suspended goals backtrack with everything else.</p>
+<h2 id="unification">Unification</h2>
+<p>The unifier implements Miller's <strong>pattern fragment</strong>. When a variable is applied to distinct bound variables, the equation has a most general solution, and the unifier computes it, pruning variables from the other side when necessary so that scope is respected. When an equation falls outside the fragment, the unifier does not guess: it <strong>delays</strong> the problem on its flexible variables and resumes it when one of them is assigned. This keeps unification complete where it is decidable and honest where it is not.</p>
+<h2 id="the-abstract-machine">The abstract machine</h2>
+<p>Solving a goal is done by an <strong>explicit abstract machine</strong>: a record of the current goal list, choice points, program, and a fuel counter, advanced by a small <code>step</code> function. There is no host recursion in the search, which gives three properties we wanted:</p>
+<ul><li><strong>Fuel.</strong> Every step costs one unit, so runaway programs stop with a resource error rather than hanging.</li><li><strong>Lazy answers.</strong> The machine can be suspended after an answer and resumed for the next. Queries return lazy streams.</li><li><strong>Auditable order.</strong> Clauses are tried top to bottom, depth-first. Clause lookup uses a first-argument index respecting modes, and the order of answers matches ELPI.</li></ul>
+<p>Cut, <code>pi</code>, <code>=&gt;</code>, and the logical connectives are goal forms handled directly by the machine. <code>pi x\ G</code> allocates a fresh level; <code>A =&gt; G</code> pushes a clause that is removed when <code>G</code> finishes.</p>
+<h2 id="front-end">Front end</h2>
+<p>The parser and type checker implement the ELPI 1.18 dialect, including overloading and modes. The type checker runs before execution, so mistakes surface with a position. A clause is compiled to an indexed form, and a program is a persistent database that new units can extend, which is how accumulation and Lean's incremental file elaboration work.</p>
+<h2 id="solver-tiers">Solver tiers</h2>
+<p>Not every problem fits resolution. The engine exposes four tiers of extension:</p>
+<ol><li><strong>T1: CHR solvers in ELPI.</strong> Constraint Handling Rules rewrite the constraint store.</li><li><strong>T2: native builtins.</strong> Deterministic predicates implemented in Lean.</li><li><strong>T3: native constraint handlers.</strong> A Lean function receives constraints and the store and decides what to keep, wake, or propagate.</li><li><strong>T4: unification hooks.</strong> When unification gets stuck on an <em>interpreted</em> symbol, a hook may solve, suspend, or reject it.</li></ol>
+<p>The tiers are ordered by how much power, and how much responsibility, they give. A rule of thumb in the project: use the lowest tier that works.</p>
+<h2 id="talking-to-lean">Talking to Lean</h2>
+<p>Lean expressions are <strong>reflected</strong> into ELPI terms: constants, applications, sorts, literals, and λ/∀/let as HOAS binders. Universe levels are opaque handles. The reflection is round-trippable, so a program can take a goal apart, build new terms, and hand them back.</p>
+<p>On top of that sit the conveniences: <code>{{ … }}</code> quotations elaborated by Lean and spliced with antiquotations, the <code>lean.*</code> builtins that run in <code>MetaM</code>, tactics defined by a <code>solve</code> predicate, commands, and <code>deriving Elpi</code> for moving your data types across. Programs are compiled when declared and stored in an environment extension, so imports replay them.</p>
+<h2 id="the-lf-layer-and-certificates">The LF layer and certificates</h2>
+<p>LF is where the project goes beyond ELPI. It is opt-in per file (<code>#lf</code>) and adds four things.</p>
+<p><strong>Checking.</strong> A bidirectional checker for the dependently typed λ-calculus λΠ: it reconstructs implicit arguments, reports expected and found types with positions, and infers whether each family is <em>syntax</em> or a <em>judgment</em>.</p>
+<p><strong>Proof terms by elaboration.</strong> The key design choice: instead of adding a trace log to the machine, each LF predicate <code>of M A</code> is elaborated at load time into <code>lf.of D M A</code>, where <code>D</code> is a <strong>proof hole</strong> bound by resolution. <code>pi</code> and hypotheses add λs over the hole. The machine itself does not change. Partial proof terms live in the persistent store, so backtracking discards them automatically.</p>
+<p><strong>Export.</strong> Lean forbids the direct HOAS encoding <code>lam : (Tm → Tm) → Tm</code> (a negative occurrence). We export syntax with binders as <strong>scope-indexed</strong> families, <code>Tm : Nat → Type</code>, with a generated <code>Var</code>, and hypothetical judgments take an explicit context, <code>Of : Ctx n → Tm n → Tp → Prop</code>, looked up through an inductive relation. Only fresh inductives and <code>Nat.succ</code> appear, so the kernel checks everything by structural conversion.</p>
+<p><strong>Certificates.</strong> A proof term is translated to a fully explicit constructor application and submitted with <code>addDecl</code>. If the kernel rejects it, the environment is left unchanged. This is the <strong>trust boundary</strong>: the parser, checker, machine and exporter may all have bugs, but none of them can cause a false theorem.</p>
+<p>Around this core are search strategies (bounded and iterative deepening, with a derivation depth per LF goal in the machine), mode checking, totality checking whose theorems are only emitted with kernel-checked proofs, and the defeq bridge, which uses a T4 hook to let Lean evaluate bridged functions.</p>
+<h2 id="how-we-test-it">How we test it</h2>
+<ul><li><strong>Spec-driven.</strong> Every requirement and scenario of the OpenSpec specification is traced to code (<code>implements</code>) and to a test (<code>verifies</code>), and a gap report must be empty.</li><li><strong>Oracle conformance.</strong> A corpus of ELPI programs is run on the real ELPI 1.18 and on LeanElpi, and the outputs are compared. Known differences are registered in a divergence file.</li><li><strong>Kernel as test oracle.</strong> For the LF layer, the strongest test is that the kernel accepts the certificates, and rejects deliberately corrupted ones.</li></ul>
+<h2 id="why-lean-and-what-it-costs">Why Lean, and what it costs</h2>
+<p>Writing the engine in Lean gives portability and, above all, direct access to the kernel for certification. The cost is that Lean is a total language: the machine's loop is <code>partial</code> and bounded by fuel, and some performance tricks of the OCaml original (mutable arrays on the hot path) are replaced by persistent structures. We took that trade deliberately for correct backtracking and simple certification, and measure before optimising.</p>
+<p>The source, specs and design notes are on <a href="https://github.com/Volland/lean-elpi">GitHub</a>.</p></article>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>
