@@ -1,0 +1,5 @@
+% Clean-room standard library for LeanElpi (Apache-2.0).
+% Written from the ELPI documentation, never from upstream source.
+% Predicates keep upstream names and behaviour; see
+% openspec/changes/add-elpi-core/specs/elpi-libraries/spec.md.
+% @lat: [[components#Standard library]]

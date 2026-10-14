@@ -1,0 +1,329 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1791966503911,
+  "projectRoot": "/Users/volodymyrpavlyshyn/Documents/work/lean-elpi",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "Templates": {
+      "path": "Templates",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1791966503902,
+      "keyFiles": [
+        "Change.md",
+        "Concept.md",
+        "Constraint.md",
+        "Decision.md",
+        "Requirement.md"
+      ]
+    },
+    "Types": {
+      "path": "Types",
+      "purpose": "Type definitions",
+      "fileCount": 1,
+      "lastAccessed": 1791966503902,
+      "keyFiles": [
+        "code-types.md"
+      ]
+    },
+    "openspec": {
+      "path": "openspec",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1791966503903,
+      "keyFiles": [
+        "config.yaml"
+      ]
+    },
+    "tg.md": {
+      "path": "tg.md",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1791966503903,
+      "keyFiles": [
+        "code-ontology.md",
+        "tg.md"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "tg.md/papers/system.md",
+      "accessCount": 2,
+      "lastAccessed": 1791969943322,
+      "type": "file"
+    },
+    {
+      "path": "openspec/config.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1791969369413,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/proposal.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969557976,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/decisions.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969568341,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-constraints/proposal.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969573662,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/alternatives.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969598882,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/constraints.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969600166,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/glossary.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969631090,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-constraints/specs/elpi-constraints/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969647221,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-constraints/specs/elpi-solver-api/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969667475,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/architecture/components.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969675075,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-core-engine/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969688379,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-typechecker/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969723444,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-solver-api/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969724732,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/architecture/architecture.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969726960,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/architecture/uml.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969728258,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-constraints/design.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969734216,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/changes.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969759479,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/overview.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969760840,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/papers/papers.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969762136,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/tg.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969763504,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-runtime-library/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969767649,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-libraries/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969768947,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-constraints/tasks.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969785621,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/papers/solvers.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969798892,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-cli/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969801230,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/papers/type-bridge.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969801568,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/specs/elpi-conformance/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969802522,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-lf/proposal.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969815092,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-lean-integration/proposal.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969818215,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/papers/engine.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969901481,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/papers/lean-together.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969905040,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-lf/specs/elpi-lf/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969906361,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-lean-integration/specs/lean-reflection/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969943032,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-core/design.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969975761,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-lean-integration/specs/lean-integration/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1791969990436,
+      "type": "file"
+    },
+    {
+      "path": "tg.md/papers/certified-lf.md",
+      "accessCount": 1,
+      "lastAccessed": 1791970017378,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-lean-integration/design.md",
+      "accessCount": 1,
+      "lastAccessed": 1791970098361,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-lf/design.md",
+      "accessCount": 1,
+      "lastAccessed": 1791970219240,
+      "type": "file"
+    },
+    {
+      "path": "openspec/changes/add-elpi-lf/tasks.md",
+      "accessCount": 1,
+      "lastAccessed": 1791970271658,
+      "type": "file"
+    },
+    {
+      "path": "tests/conformance/run.sh",
+      "accessCount": 1,
+      "lastAccessed": 1791970273317,
+      "type": "file"
+    },
+    {
+      "path": "tests/conformance/selftest.sh",
+      "accessCount": 1,
+      "lastAccessed": 1791970344577,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

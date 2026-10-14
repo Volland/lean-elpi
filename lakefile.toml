@@ -1,0 +1,13 @@
+name = "lean-elpi"
+version = "0.1.0"
+defaultTargets = ["Elpi", "lean-elpi"]
+
+[leanOptions]
+autoImplicit = false
+
+[[lean_lib]]
+name = "Elpi"
+
+[[lean_exe]]
+name = "lean-elpi"
+root = "Elpi.Cli.Main"

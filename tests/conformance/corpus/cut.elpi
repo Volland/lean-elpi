@@ -1,0 +1,12 @@
+% Conformance: cut prunes the remaining clauses of the predicate only.
+% Exercises: elpi-core-engine › Cut.
+pred p o:int.
+p 1.
+p 2 :- !.
+p 3.
+
+pred q o:int.
+q X :- p X.
+q 4.
+
+main :- std.findall (q X_) S, print S.

@@ -1,0 +1,7 @@
+% Conformance: list append in all modes the oracle accepts.
+% Exercises: elpi-core-engine › Depth-first search order (answer order).
+pred append o:list A, o:list A, o:list A.
+append [] L L.
+append [X|XS] L [X|R] :- append XS L R.
+
+main :- std.findall (append X_ Y_ [1,2,3]) S, print S.

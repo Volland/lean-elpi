@@ -1,0 +1,59 @@
+schema: spec-driven
+
+# Project context, shown to AI when creating artifacts.
+context: |
+  Project: LeanElpi, a clean-room native Lean 4 implementation of the ELPI dialect of
+  Lambda Prolog (lambda-Prolog), embeddable in Lean.
+
+  Goals (in priority order):
+    1. Run real ELPI 1.18 programs natively in Lean with the same answers, in the same order,
+       as the upstream OCaml `elpi` binary (installed via opam, used only as a test oracle).
+    2. Let Lean and ELPI work together: ELPI programs that read and build Lean terms, run as
+       Lean commands and tactics, and call Lean (MetaM) through builtins.
+    3. Let users write their own solvers: CHR in ELPI, Lean builtins, native constraint
+       handlers and unification hooks.
+    4. Ship LP as a library for ordinary Lean programs (pure lazy queries), a standalone CLI
+       `lean-elpi`, and precompiled executables of ELPI programs.
+    5. Extend ELPI with LF (lambda-Pi) as an opt-in dependent layer whose proof terms are
+       exported to Lean inductive families and checked by the Lean kernel.
+
+  Non-goals: CIC as ELPI's object theory; ELPI 2.x syntax; porting or vendoring upstream
+  LGPL code; a Mathlib dependency; mutable-heap performance tuning before correctness.
+
+  Tech stack: Lean 4.35.0 (lean-toolchain leanprover/lean4:v4.35.0), Lake, no Mathlib.
+  Engine core is MetaM-free and generic over a `Backtrackable` monad; Lean integration
+  instantiates it at MetaM. License Apache-2.0 (clean-room).
+
+  Milestones = OpenSpec changes: add-elpi-core (M1), add-elpi-constraints (M2),
+  add-lean-integration (M3), add-elpi-lf (dependent extension).
+
+  Knowledge graph: tg.md/ (read with the `tg` CLI). Intent types: Decision
+  (tg.md/decisions.md, tg.md/alternatives.md), Constraint (tg.md/constraints.md), Concept
+  (tg.md/glossary.md), Component (tg.md/architecture/components.md), Change
+  (tg.md/changes.md). Requirements and Scenarios live here in OpenSpec. Explanatory papers
+  live in tg.md/papers/. The naming of requirements is a contract: code, tests and docs cite
+  them as [[openspec:<capability>#<Requirement>]].
+
+  Conventions: Lean code comments use `--`; put the tg `implements` annotation on the line
+  above the implementing declaration and the tg `verifies` annotation above the test. Tests are Lean
+  `#guard_msgs` golden tests under tests/ plus the conformance corpus in tests/conformance/.
+
+rules:
+  proposal:
+    - "tg: Under Impact, list the lat.md sections this change touches; find them with `tg search`, and name the requirements it adds or modifies as `[[openspec:<capability>#<Requirement>]]`."
+    - "Name the tg.md Decisions (`[[decisions#<title>]]`) and Constraints (`[[constraints#<title>]]`) that motivate the change, and the Components (`[[components#<title>]]`) it introduces."
+    - "State the milestone (M1, M2, M3 or LF) and which earlier changes this one depends on."
+  specs:
+    - "tg: Give every requirement a stable, unique name: code, tests and docs cite it as `[[openspec:<capability>#<Requirement>]]`, and a renamed requirement breaks those links."
+    - "tg: Give every scenario a unique name within its requirement; tests cite it as `[[openspec:<capability>#<Requirement>#<Scenario>]]`."
+    - "Requirements describe observable behaviour of the engine, the Lean API or the CLI; when ELPI 1.18 defines the behaviour, say that the oracle's answer is the reference."
+  design:
+    - "tg: Link the lat.md sections the design builds on with `[[section]]` references, and name decisions so a lat.md Decision section can record them."
+    - "Include at least one Mermaid UML diagram (class, sequence, state or component) for the parts this change introduces."
+    - "For each design decision, name the tg.md Decision it records or propose a new one, and list the rejected alternatives."
+  tasks:
+    - "tg: For each requirement, include a task to annotate the code that implements it with a comment `@tg: implements:: [[openspec:<capability>#<Requirement>]]` on the line above the function, class or file."
+    - "tg: For each scenario, include a task to annotate the test that proves it with a comment `@tg: verifies:: [[openspec:<capability>#<Requirement>#<Scenario>]]` directly above the test call."
+    - "tg: Include a task to update the lat.md section that explains each capability and list the capability in that file's `openspec:` frontmatter."
+    - "For behaviour defined by ELPI 1.18, include a task to add a corpus program to tests/conformance/corpus/ and compare against the oracle."
+    - "tg: End with a task to run `tg check` and `tg trace <capability> --gaps` and close every gap they report."

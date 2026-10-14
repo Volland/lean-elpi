@@ -1,0 +1,6 @@
+% Conformance: spilling evaluates the inner call first.
+% Exercises: elpi-core-engine › Spilling.
+pred double i:int, o:int.
+double X Y :- Y is X * 2.
+
+main :- print {double {double 3}}.

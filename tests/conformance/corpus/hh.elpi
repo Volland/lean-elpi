@@ -1,0 +1,14 @@
+% Conformance: hereditary Harrop goals (pi and implication).
+% Exercises: elpi-core-engine › Hereditary Harrop goals.
+kind tm type.
+type app tm -> tm -> tm.
+type lam (tm -> tm) -> tm.
+kind ty type.
+type arr ty -> ty -> ty.
+type nat ty.
+
+pred of i:tm, o:ty.
+of (app M N) B :- of M (arr A B), of N A.
+of (lam F) (arr A B) :- pi x\ of x A => of (F x) B.
+
+main :- of (lam x\ lam y\ app x y) T, print T.
