@@ -12,7 +12,7 @@ Its declarations SHALL match exactly the encoding defined by the `lean-reflectio
 #### Scenario: lean library declares the term type
 - **WHEN** a program accumulates `lean` and declares `pred head-const i:term, o:name.` with the clause `head-const (app (const N _) _) N.`
 - **THEN** the program loads with no type errors
-- **AND** the same program without `accumulate lean.` is rejected with "undeclared constant app"
+- **AND** the same program without `accumulate lean.` is rejected, because the type `term` and the constructor `app` are not declared
 
 ### Requirement: Tactic combinator library
 The library `lean.ltac` (`lib/elpi/lean.ltac.elpi`) SHALL define `typeabbrev tactic (goal -> list goal -> prop)`, the basic tactics `lean.ltac.intro`, `lean.ltac.exact`, `lean.ltac.apply`, `lean.ltac.refine` and `lean.ltac.assumption`, and the combinators `lean.ltac.then`, `lean.ltac.thenl`, `lean.ltac.orelse`, `lean.ltac.try`, `lean.ltac.repeat` and `lean.ltac.focus`. The combinators SHALL behave like their Lean tactic counterparts:

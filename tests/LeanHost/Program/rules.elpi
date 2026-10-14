@@ -1,0 +1,4 @@
+kind t type.
+type a, b t.
+pred edge i:t, o:t.
+edge a b.

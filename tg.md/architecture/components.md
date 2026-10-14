@@ -164,7 +164,7 @@ The library for ordinary Lean programs: pure lazy `Elpi.solve`, `solveIO`, `solv
 
 ## Expr reflection
 
-Lossless translation between `Lean.Expr` and the HOAS ELPI `term`, with universe levels as opaque handles, plus `{{ }}` quotations. Source: `Elpi/Lean/Reflect.lean`.
+Lossless translation between `Lean.Expr` and the HOAS ELPI `term`, with universe levels as opaque handles, plus `{{ }}` quotations. Source: `Elpi/Lean/Reflect.lean` (reflection) and `Elpi/Lean/Quote.lean` (quotations).
 
 - module:: Elpi.Lean.Reflect
 - milestone:: M3

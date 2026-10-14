@@ -16,24 +16,39 @@ so that asserting a clause shares structure with the original program.
 
 namespace Elpi
 
-/-- Interned constants: the first entries are reserved for control constructs. -/
+/-- Interned constants. The reserved control constants have small fixed ids; every other
+name gets an id determined by the name itself (a hash, probed on the rare collision), so a
+`ConstId` means the same thing in every program and Lean values can be encoded without a
+symbol table. -/
 structure Symbols where
-  names : Array String := #[]
+  byId : Std.HashMap Nat String := {}
   ids : Std.HashMap String Nat := {}
   deriving Inhabited
+
+/-- Id of a non-reserved name: above the reserved range, a function of the name only. -/
+def symbolId (n : String) : Nat := 1048576 + (hash n).toNat % (2 ^ 40)
 
 def Symbols.intern (s : Symbols) (n : String) : ConstId × Symbols :=
   match s.ids[n]? with
   | some i => (⟨i⟩, s)
-  | none => (⟨s.names.size⟩, { names := s.names.push n, ids := s.ids.insert n s.names.size })
+  | none =>
+    let rec probe (i : Nat) (fuel : Nat) : Nat :=
+      match fuel with
+      | 0 => i
+      | f + 1 => if s.byId.contains i then probe (i + 1) f else i
+    let i := probe (symbolId n) 4096
+    (⟨i⟩, { byId := s.byId.insert i n, ids := s.ids.insert n i })
 
 def Symbols.find? (s : Symbols) (n : String) : Option ConstId := (s.ids[n]?).map (⟨·⟩)
 
-def Symbols.name (s : Symbols) (c : ConstId) : String := s.names[c.idx]!
+def Symbols.name (s : Symbols) (c : ConstId) : String := (s.byId[c.idx]?).getD s!"<const {c.idx}>"
 
 def reservedNames : Array String :=
   #["true", "fail", "!", ",", ";", "=>", "pi", "sigma", "=", "not", ":-", "[]", "::",
-    "findall_solutions", "->", "<=", "halt", "print", "some", "none", "pr", "tt", "ff", "?-", "declare_constraint"]
+    "findall_solutions", "->", "<=", "halt", "print", "some", "none", "pr", "tt", "ff", "?-", "declare_constraint",
+    -- the reflection of Lean terms (`lean.elpi`) and the tactic interface
+    "const", "app", "fun", "forall", "let", "sort", "lit", "mvar", "fvar", "proj", "mdata",
+    "nat", "str", "decl", "goal", "int", "trm"]
 
 def cTrue : ConstId := ⟨0⟩
 def cFail : ConstId := ⟨1⟩
@@ -58,9 +73,34 @@ def cTT : ConstId := ⟨21⟩
 def cFF : ConstId := ⟨22⟩
 def cTurn : ConstId := ⟨23⟩
 def cDeclare : ConstId := ⟨24⟩
+-- constructors of the reflected Lean `term` type, see `Elpi/Lean/Reflect.lean`
+def cConstR : ConstId := ⟨25⟩
+def cAppR : ConstId := ⟨26⟩
+def cFunR : ConstId := ⟨27⟩
+def cForallR : ConstId := ⟨28⟩
+def cLetR : ConstId := ⟨29⟩
+def cSortR : ConstId := ⟨30⟩
+def cLitR : ConstId := ⟨31⟩
+def cMVarR : ConstId := ⟨32⟩
+def cFVarR : ConstId := ⟨33⟩
+def cProjR : ConstId := ⟨34⟩
+def cMDataR : ConstId := ⟨35⟩
+def cNatLitR : ConstId := ⟨36⟩
+def cStrLitR : ConstId := ⟨37⟩
+def cDeclR : ConstId := ⟨38⟩
+def cGoalR : ConstId := ⟨39⟩
+def cIntArgR : ConstId := ⟨40⟩
+def cTrmArgR : ConstId := ⟨41⟩
 
-def Symbols.initial : Symbols :=
-  reservedNames.foldl (fun s n => (s.intern n).2) {}
+def Symbols.initial : Symbols := Id.run do
+  let mut s : Symbols := {}
+  for i in [0:reservedNames.size] do
+    s := { byId := s.byId.insert i reservedNames[i]!, ids := s.ids.insert reservedNames[i]! i }
+  return s
+
+/-- Names interned beyond the reserved ones. -/
+def Symbols.userNames (s : Symbols) : List String :=
+  s.ids.toList.filterMap fun (n, i) => if i < reservedNames.size then none else some n
 
 /-- A compiled clause; `cvar i` ranges over `i < nvars`. -/
 structure Clause where

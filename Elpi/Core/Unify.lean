@@ -98,9 +98,13 @@ partial def inv (c : InvCtx) (s : Store) (t : Term) (k : Nat) : InvR Term :=
         else
           let ℓ' := min ℓy c.lvl
           let (y', s2) := s1.fresh ℓ' (s1.nameOf y)
-          let val := lams m (.uvar y' (kept.map fun i => .bound (ℓy + i)))
+          -- `y` sees the names that `x` abstracts over when they are in its scope; its
+          -- replacement (of a lower level) must receive them as arguments
+          let extra := (List.range n).filter fun i => c.spine[i]! ≥ c.lvl && c.spine[i]! < ℓy
+          let val := lams m (.uvar y' (kept.map (fun i => Term.bound (ℓy + i)) ++
+                                       extra.toArray.map fun i => Term.bound c.spine[i]!))
           let s3 := s2.setAssign y val
-          .ok s3 (.uvar y' outs)
+          .ok s3 (.uvar y' (outs ++ extra.toArray.map fun i => Term.bound (c.lvl + i)))
 
 partial def invArr (c : InvCtx) (s : Store) (xs : Array Term) (k : Nat) : InvR (Array Term) :=
   let rec go (i : Nat) (s : Store) (acc : Array Term) : InvR (Array Term) :=

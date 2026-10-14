@@ -1,5 +1,6 @@
 import Std.Data.HashSet
 import Std.Data.HashMap
+import Elpi.Core.Term
 
 /-!
 # Parser
@@ -33,11 +34,16 @@ inductive STm where
   | app (f : STm) (args : List STm) (p : Pos)
   | lam (x : String) (b : STm) (p : Pos)
   | spill (g : STm) (p : Pos)
+  /-- A Lean quotation `{{ t }}`, elaborated by the Lean integration before lowering. -/
+  | quote (text : String) (p : Pos)
+  /-- An elaborated quotation: a reflected term whose `cvar i` stand for the antiquotations
+  `holes[i]` and, past those, for fresh variables (`nvars` in total). -/
+  | term (t : Term) (holes : List STm) (nvars : Nat) (p : Pos)
   deriving Inhabited
 
 def STm.pos : STm → Pos
   | .const _ p | .var _ p | .int _ p | .float _ p | .str _ p
-  | .app _ _ p | .lam _ _ p | .spill _ p => p
+  | .app _ _ p | .lam _ _ p | .spill _ p | .quote _ p | .term _ _ _ p => p
 
 /-- Surface types. -/
 inductive STy where
@@ -93,6 +99,7 @@ inductive Tok where
   | sym (s : String)          -- operator symbols such as `:-`, `=>`, `::`
   | bind (s : String)         -- `x\`
   | lp | rp | lb | rb | lc | rc
+  | quote (s : String)
   | comma | semi | bar | dot
   | eof
   deriving BEq, Inhabited
@@ -191,6 +198,25 @@ partial def lex (file : String) (src : String) : Except ParseError (Array Token)
         if j < n && cs[j]! == '\\' then
           tok := .bind s; len := len + 1
         else tok := .ident s
+      else if c == '{' && i + 1 < n && cs[i+1]! == '{' then
+        -- a Lean quotation `{{ … }}`, with nested `{{ … }}` for antiquotations
+        let mut j := i + 2
+        let mut depth := 1
+        while j < n && depth > 0 do
+          if cs[j]! == '{' && j + 1 < n && cs[j+1]! == '{' then depth := depth + 1; j := j + 2
+          else if cs[j]! == '}' && j + 1 < n && cs[j+1]! == '}' then depth := depth - 1; j := j + 2
+          else j := j + 1
+        if depth > 0 then throw { pos, msg := "unterminated quotation" }
+        tok := .quote (String.ofList (cs.extract (i + 2) (j - 2)).toList)
+        len := j - i
+        for k in [i:j] do
+          if cs[k]! == '\n' then
+            line := line + 1
+            col := 0
+          else col := col + 1
+        out := out.push { tok, pos, space }
+        i := j; space := false
+        continue
       else if c == '(' then tok := .lp
       else if c == ')' then tok := .rp
       else if c == '[' then tok := .lb
@@ -275,6 +301,7 @@ def tokDesc : Tok → String
   | .int i => toString i
   | .float f => toString f
   | .str s => s!"\"{s}\""
+  | .quote s => "{{" ++ s ++ "}}"
   | .lp => "(" | .rp => ")" | .lb => "[" | .rb => "]" | .lc => "{" | .rc => "}"
   | .comma => "," | .semi => ";" | .bar => "|" | .dot => "." | .eof => "end of input"
 
@@ -294,7 +321,7 @@ def opOf : Tok → Option String
 /-- Can this token start an application argument? -/
 def startsArg : Tok → Bool
   | .ident s => (infixInfo s).isNone
-  | .var _ | .int _ | .float _ | .str _ | .bind _ | .lp | .lb | .lc => true
+  | .var _ | .int _ | .float _ | .str _ | .bind _ | .lp | .lb | .lc | .quote _ => true
   | .sym "!" => true
   | _ => false
 
@@ -340,6 +367,7 @@ partial def parseAtom : PM STm := do
   | .float f => advance; return .float f t.pos
   | .str s => advance; return .str s t.pos
   | .sym "!" => advance; return .const "!" t.pos
+  | .quote q => advance; return .quote q t.pos
   | .bind x =>
     advance
     let b ← parseExpr 0
@@ -733,6 +761,15 @@ partial def findConst (name : String) : STm → Option Pos
   | .app f as _ => (findConst name f).orElse fun _ => as.findSome? (findConst name)
   | .lam _ b _ => findConst name b
   | .spill g _ => findConst name g
+  | _ => none
+
+/-- First Lean quotation that has not been elaborated. -/
+partial def findQuote : STm → Option Pos
+  | .quote _ p => some p
+  | .app f as _ => (findQuote f).orElse fun _ => as.findSome? findQuote
+  | .lam _ b _ => findQuote b
+  | .spill g _ => findQuote g
+  | .term _ hs _ _ => hs.findSome? findQuote
   | _ => none
 
 /-- Features of later milestones are rejected at load time. -/

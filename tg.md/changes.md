@@ -33,7 +33,7 @@ Milestone M3: Expr reflection, marshalling and `deriving Elpi`, quotations, comm
 
 Depends on [[changes#add-elpi-core]] and [[changes#add-elpi-constraints]]. Capabilities: `lean-reflection`, `lean-integration`, `elpi-runtime-library` (rule DSL), `elpi-libraries` (lean, lean.ltac, lean.derive). Files: `openspec/changes/add-lean-integration/`.
 
-- status:: proposed
+- status:: implemented
 - milestone:: M3
 
 ## add-elpi-lf

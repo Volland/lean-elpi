@@ -1,0 +1,99 @@
+% The Lean API library of LeanElpi: reflection of Lean terms, the tactic interface and the
+% signatures of the `lean.*` builtins. Load it with `accumulate lean.`
+% @tg: implements:: [[openspec:elpi-libraries#Lean API library]]
+
+% ---- opaque host values --------------------------------------------------
+kind name type.
+kind binder type.
+kind level type.
+kind mvarid type.
+kind fvarid type.
+kind mdata type.
+
+kind literal type.
+type nat int -> literal.
+type str string -> literal.
+
+% ---- the reflected term ---------------------------------------------------
+kind term type.
+type const name -> list level -> term.
+type app term -> list term -> term.
+type fun binder -> term -> (term -> term) -> term.
+type forall binder -> term -> (term -> term) -> term.
+type let binder -> term -> term -> (term -> term) -> term.
+type sort level -> term.
+type lit literal -> term.
+type mvar mvarid -> term.
+type fvar fvarid -> term.
+type proj name -> int -> term -> term.
+type mdata mdata -> term -> term.
+
+% Pseudo-constructor: `lean.lam-fvar F B T Body` is the lambda that abstracts the free
+% variable F from Body (used by tactics such as intro).
+type lean.lam-fvar fvarid -> binder -> term -> term -> term.
+
+% ---- tactics -----------------------------------------------------------------
+kind decl type.
+type decl term -> name -> term -> decl.
+
+kind goal type.
+type goal list decl -> term -> term -> goal.
+
+kind argument type.
+type int int -> argument.
+type str string -> argument.
+type trm term -> argument.
+
+% ---- environment information --------------------------------------------------
+kind ctorinfo type.
+type ctorinfo name -> int -> ctorinfo.
+
+kind info type.
+type inductinfo list ctorinfo -> int -> info.
+type constinfo term -> info.
+
+kind lean.declaration type.
+type lean.def name -> term -> term -> lean.declaration.
+type lean.inst name -> term -> term -> lean.declaration.
+
+% ---- builtins (implemented in Lean, see Elpi/Lean/Builtins.lean) ----------------
+pred lean.env.find i:name, o:info.
+pred lean.infer i:term, o:term.
+pred lean.whnf i:term, o:term.
+pred lean.defeq i:term, i:term.
+pred lean.elab i:string, i:term, o:term.
+pred lean.mk_mvar i:term, o:term.
+pred lean.pp i:term, o:string.
+pred lean.add_decl i:lean.declaration.
+pred lean.db.accumulate i:string, i:string.
+pred lean.last-error o:string.
+pred lean.name->string i:name, o:string.
+pred lean.string->name i:string, o:name.
+pred lean.error i:string.
+pred lean.fresh-fvar i:string, o:term.
+pred lean.binder-named i:string, i:binder, o:binder.
+pred lean.inst-mvars i:term, o:term.
+
+% ---- helpers written in ELPI ------------------------------------------------------
+% Structural copy of a term. Add clauses (under `pi x\ copy x y =>`) to customise it.
+pred copy i:term, o:term.
+copy (const N L) (const N L).
+copy (app H As) (app H1 As1) :- copy H H1, std.map As copy As1.
+copy (fun N T F) (fun N T1 F1) :- copy T T1, pi x\ copy x x => copy (F x) (F1 x).
+copy (forall N T F) (forall N T1 F1) :- copy T T1, pi x\ copy x x => copy (F x) (F1 x).
+copy (let N T V F) (let N T1 V1 F1) :- copy T T1, copy V V1, pi x\ copy x x => copy (F x) (F1 x).
+copy (sort L) (sort L).
+copy (lit L) (lit L).
+copy (mvar M) (mvar M).
+copy (fvar F) (fvar F).
+copy (proj S I T) (proj S I T1) :- copy T T1.
+copy (mdata D T) (mdata D T1) :- copy T T1.
+
+% Application that keeps the spine flat.
+pred lean.mk_app i:term, i:list term, o:term.
+lean.mk_app (app H As) Bs (app H Cs) :- !, std.append As Bs Cs.
+lean.mk_app H Bs (app H Bs).
+
+% Instantiate a binder body.
+pred lean.subst i:(term -> term), i:term, o:term.
+lean.subst F A (F A).

@@ -50,6 +50,8 @@ structure Abbrev where
 structure Signature where
   kinds : Std.HashMap String Nat := {}
   consts : Std.HashMap String Scheme := {}
+  /-- Further declared types of an overloaded constant (the first is in `consts`). -/
+  overloads : Std.HashMap String (Array Scheme) := {}
   abbrevs : Std.HashMap String Abbrev := {}
   modes : Std.HashMap String (Array Mode) := {}
   deriving Inhabited
@@ -143,8 +145,14 @@ def checkSignature (sig : Signature) : Decl → Except TypeError Signature
     return { sig with abbrevs := sig.abbrevs.insert name { params, body } }
   | .type names ty _ => do
     let (t, vars) ← expandAbbrev sig ty #[]
+    let sc : Scheme := { nvars := vars.size, ty := t }
     return names.foldl (fun s n =>
-      { s with consts := s.consts.insert n { nvars := vars.size, ty := t } }) sig
+      match s.consts[n]? with
+      | some old =>
+        -- a second, different type overloads the constant
+        if old.ty == t then s
+        else { s with overloads := s.overloads.insert n ((s.overloads.getD n #[]).push sc) }
+      | none => { s with consts := s.consts.insert n sc }) sig
   | .pred name args _ => do
     let mut vars : Array String := #[]
     let mut tys : Array Ty := #[]
@@ -270,6 +278,10 @@ partial def check (env : Env) (t : STm) (expected : Ty) : TCM Unit := do
   | .float _ p => expect p "float" expected (.con "float" [])
   | .str s p => expect p s!"\"{s}\"" expected (.con "string" [])
   | .spill g _ => check env g expected
+  | .quote _ p => report p "a Lean quotation needs a Lean environment"
+  | .term _ holes _ p =>
+    expect p "quotation" expected (.con "term" [])
+    for h in holes do check env h (.con "term" [])
   | .var n p =>
     let known ← if n == "_" then pure none else do pure ((← get).vars[n]?)
     let ty ← match known with
@@ -287,15 +299,41 @@ partial def check (env : Env) (t : STm) (expected : Ty) : TCM Unit := do
   | .const n p =>
     match env.bound.lookup n with
     | some ty => expect p n expected ty
-    | none => checkConst env n p expected
+    | none =>
+      let alts := env.sig.overloads.getD n #[]
+      if alts.isEmpty then checkConst env n p expected
+      else
+        -- try the declared types in turn; a failed attempt leaves no trace
+        let s0 ← get
+        let mut done := false
+        for sc in #[env.sig.consts[n]?.getD default] ++ alts do
+          if done then break
+          let ty ← instantiate sc
+          if ← unifyTy expected ty then done := true
+          else set s0
+        unless done do checkConst env n p expected
   | .app f args p =>
     match f with
     | .const n fp =>
       match env.bound.lookup n with
       | some ty => checkSpine env ty args p expected n
       | none =>
-        let ty ← constType env n fp expected (some args.length)
-        checkSpine env ty args p expected n
+        let alts := env.sig.overloads.getD n #[]
+        if alts.isEmpty then
+          let ty ← constType env n fp expected (some args.length)
+          checkSpine env ty args p expected n
+        else
+          let s0 ← get
+          let mut done := false
+          for sc in #[env.sig.consts[n]?.getD default] ++ alts do
+            if done then break
+            let ty ← instantiate sc
+            checkSpine env ty args p expected n
+            if (← get).errors.size == s0.errors.size then done := true
+            else set s0
+          unless done do
+            let ty ← constType env n fp expected (some args.length)
+            checkSpine env ty args p expected n
     | .var .. =>
       let ty ← inferHead env f
       checkSpine env ty args p expected "variable"
@@ -346,6 +384,10 @@ partial def checkSpine (env : Env) (fty : Ty) (args : List STm) (p : Pos) (expec
     if tys.length < args.length then
       report p s!"{what} is applied to {args.length} arguments but its type {← zonkTy fty} takes {tys.length}"
     else
+      -- propagate the expected result type first, so that overloaded constructors among the
+      -- arguments see their expected type
+      let s0 ← get
+      unless ← unifyTy expected res do set s0
       for (x, a) in args.zip tys do check env x a
       expect p s!"application of {what}" expected res
 end

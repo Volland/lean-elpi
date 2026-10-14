@@ -1,0 +1,49 @@
+% Conformance: the plain-ELPI control flow of the lean.ltac combinators (orelse leaves no
+% choice point, then maps over the goals, thenl checks lengths, repeat stops on failure),
+% on a stand-in `goal` type with no lean.* builtins.
+% Exercises: elpi-libraries › Tactic combinator library.
+kind goal type.
+type g int -> goal.
+typeabbrev tactic (goal -> list goal -> prop).
+
+pred then i:tactic, i:tactic, i:goal, o:list goal.
+then T1 T2 G Gs :- T1 G Gs1, std.map Gs1 T2 Gss, std.flatten Gss Gs.
+
+pred thenl i:tactic, i:list tactic, i:goal, o:list goal.
+thenl T Ts G Gs :-
+  T G Gs1, std.length Gs1 N, std.length Ts N,
+  std.map2 Ts Gs1 (t\ g\ r\ t g r) Gss, std.flatten Gss Gs.
+
+pred orelse i:tactic, i:tactic, i:goal, o:list goal.
+orelse T1 _ G Gs :- T1 G Gs, !.
+orelse _ T2 G Gs :- T2 G Gs.
+
+pred try i:tactic, i:goal, o:list goal.
+try T G Gs :- orelse T (g\ r\ r = [g]) G Gs.
+
+pred repeat i:tactic, i:goal, o:list goal.
+repeat T G Gs :- T G Gs1, !, std.map Gs1 (repeat T) Gss, std.flatten Gss Gs.
+repeat _ G [G].
+
+pred focus i:tactic, i:goal, o:list goal.
+focus T G [] :- T G [].
+
+% a splitting tactic that fails below 2, and one that always fails
+pred halve i:goal, o:list goal.
+halve (g N) [g M, g K] :- N >= 2, M is N div 2, K is N - M.
+
+pred never i:goal, o:list goal.
+never _ _ :- fail.
+
+pred id i:goal, o:list goal.
+id G [G].
+
+main :-
+  repeat halve (g 5) L1, print L1,
+  then halve halve (g 8) L2, print L2,
+  orelse never halve (g 3) L3, print L3,
+  try never (g 1) L4, print L4,
+  (thenl halve [halve, id] (g 4) L5, print L5),
+  (thenl halve [halve] (g 4) _, print "bad" ; print "length mismatch"),
+  (focus halve (g 4) _, print "bad" ; print "focus fails"),
+  std.findall (orelse id id (g 9) _G_) R, print R.

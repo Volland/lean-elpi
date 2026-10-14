@@ -56,6 +56,14 @@ partial def lowerTm (binders : Array String) : STm → LM Term
   | .str s _ => return .lit (.str s)
   | .lam x b _ => do return .lam (← lowerTm (binders.push x) b)
   | .spill _ p => panic! s!"{p.toString}: unexpected spill"
+  | .quote _ p => panic! s!"{p.toString}: unelaborated quotation"
+  | .term t holes nvars _ => do
+    let hs ← holes.toArray.mapM (lowerTm binders)
+    let mut vars := hs
+    for _ in [hs.size:nvars] do
+      let i ← freshVar "_"
+      vars := vars.push (.cvar i #[])
+    return Term.renameCVars vars binders.size t
   | .app f args _ => do
     let f' ← lowerTm binders f
     let args' ← args.toArray.mapM (lowerTm binders)
@@ -135,6 +143,8 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
   let mut clauses : Array (Attrs × STm × Pos) := #[]
   for d in decls do
     if let .clause a t pos := d then
+      if let some q := findQuote t then
+        throw (.load s!"{q.toString}: Lean quotations need a Lean environment (use elpi_accumulate or #elpi)")
       if let some (q, what) := unsupportedFeature t then
         throw (.load s!"{q.toString}: '{what}' is unsupported in this milestone")
       clauses := clauses.push (a, elimSpilling t, pos)
@@ -268,6 +278,7 @@ def Solution.constraintLines (s : Solution) : List String :=
 
 def Solution.find? (s : Solution) (n : String) : Option Term := s.bindings.lookup n
 
+
 /-- Default fuel budget: resolution steps per run. -/
 def defaultFuel : Nat := 100000000
 
@@ -293,12 +304,11 @@ def CompiledProgram.env (p : CompiledProgram) (m : Type → Type) [Monad m] [Out
       | some c => h.insert c.idx b
       | none => h }
 
-/-- Parse, typecheck and lower a query; returns the initial machine. -/
-def CompiledProgram.prepare (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) :
+/-- Typecheck and lower a parsed query; returns the initial machine. -/
+def CompiledProgram.prepareTm (p : CompiledProgram) (t : STm) (fuel : Nat := defaultFuel) :
     Except ElpiError Prepared := do
-  let t ← match Parser.parseQuery "<query>" q with
-    | .ok t => pure t
-    | .error e => throw (.parse e.toString)
+  if let some q := findQuote t then
+    throw (.load s!"{q.toString}: Lean quotations need a Lean environment (use #elpi)")
   let (t', _) := elimGoal t 0
   match Typecheck.checkProgram p.sig [] (some t') p.definedNames with
   | .error es => throw (.type (joinErrs es))
@@ -321,6 +331,32 @@ def CompiledProgram.prepare (p : CompiledProgram) (q : String) (fuel : Nat := de
                         store, fuel }
            syms := ls.syms
            names }
+
+/-- Build the initial machine from a goal constructed directly as a term: `vars` are fresh
+query variables (level 0) handed to `mk`. No typechecking: the caller vouches for the term. -/
+def CompiledProgram.prepareRaw (p : CompiledProgram) (vars : List String)
+    (mk : Array Term → Term) (fuel : Nat := defaultFuel) : Prepared := Id.run do
+  let mut store : Store :=
+    { hooks := p.hooks
+      interp := p.hooks.foldl (init := #[]) fun a h =>
+        h.interpreted.foldl (init := a) fun a n => match p.syms.find? n with | some c => a.push c.idx | none => a }
+  let mut vs : Array Term := #[]
+  let mut names : Array (String × UVarId) := #[]
+  for n in vars do
+    let (u, s') := store.fresh 0 (some n)
+    store := s'
+    vs := vs.push (.uvar u #[])
+    names := names.push (n, u)
+  return { machine := { goals := [{ goal := mk vs, depth := 0, locals := [], cutTo := 0 }], store, fuel }
+           syms := p.syms, names }
+
+/-- Parse, typecheck and lower a query; returns the initial machine. -/
+def CompiledProgram.prepare (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) :
+    Except ElpiError Prepared := do
+  let t ← match Parser.parseQuery "<query>" q with
+    | .ok t => pure t
+    | .error e => throw (.parse e.toString)
+  p.prepareTm t fuel
 
 def mkSolution (syms : Symbols) (names : Array (String × UVarId)) (sol : RawSolution) :
     Solution :=
@@ -373,82 +409,112 @@ def solveIO (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) :
 
 /-! ### Typed decoding -/
 
+/-- A decoding failure: what was expected and the term that was found. -/
+structure DecodeError where
+  expected : String
+  got : String
+  deriving Inhabited
+
+def DecodeError.toString (e : DecodeError) : String :=
+  s!"cannot decode: expected {e.expected} but got {e.got}"
+
+instance : ToString DecodeError := ⟨DecodeError.toString⟩
+
+def showTerm (t : Term) : String :=
+  (Print.pp t 0 0 true).run' { syms := Symbols.initial, store := {} }
+
+def DecodeError.mk' (expected : String) (t : Term) : DecodeError :=
+  { expected, got := showTerm t }
+
+-- @tg: implements:: [[openspec:lean-reflection#Typed marshalling classes]]
 class FromElpi (α : Type) where
   tyName : String
-  decode : Symbols → Term → Option α
+  fromElpi : Term → Except DecodeError α
+
+export FromElpi (fromElpi)
 
 instance : FromElpi Int where
   tyName := "Int"
-  decode _ | .lit (.int i) => some i | _ => none
+  fromElpi | .lit (.int i) => .ok i | t => .error (.mk' "int" t)
 instance : FromElpi Nat where
   tyName := "Nat"
-  decode _ | .lit (.int i) => if i ≥ 0 then some i.toNat else none | _ => none
+  fromElpi | .lit (.int i) => if i ≥ 0 then .ok i.toNat else .error (.mk' "int" (.lit (.int i)))
+           | t => .error (.mk' "int" t)
 instance : FromElpi String where
   tyName := "String"
-  decode _ | .lit (.str s) => some s | _ => none
+  fromElpi | .lit (.str s) => .ok s | t => .error (.mk' "string" t)
 instance : FromElpi Float where
   tyName := "Float"
-  decode _ | .lit (.float f) => some f | _ => none
+  fromElpi | .lit (.float f) => .ok f | t => .error (.mk' "float" t)
 instance : FromElpi Bool where
   tyName := "Bool"
-  decode _ | .const c => if c == cTT || c == cTrue then some true
-                         else if c == cFF || c == cFail then some false else none
-           | _ => none
+  fromElpi | .const c => if c == cTT || c == cTrue then .ok true
+                         else if c == cFF || c == cFail then .ok false
+                         else .error (.mk' "bool" (.const c))
+           | t => .error (.mk' "bool" t)
 instance : FromElpi Term where
-  tyName := "Term"
-  decode _ t := some t
+  tyName := "term"
+  fromElpi t := .ok t
 
-partial def decodeList {α : Type} (f : Term → Option α) : Term → Option (List α)
-  | .const c => if c == cNil then some [] else none
-  | .app (.const c) #[x, xs] =>
-    if c == cCons then do
-      let a ← f x
-      let rest ← decodeList f xs
-      return a :: rest
-    else none
-  | _ => none
+partial def decodeList {α : Type} (f : Term → Except DecodeError α) (t0 : Term) :
+    Except DecodeError (List α) :=
+  let rec go : Term → Except DecodeError (List α)
+    | .const c => if c == cNil then .ok [] else .error (.mk' "list" t0)
+    | .app (.const c) #[x, xs] =>
+      if c == cCons then do
+        let a ← f x
+        let rest ← go xs
+        return a :: rest
+      else .error (.mk' "list" t0)
+    | _ => .error (.mk' "list" t0)
+  go t0
 
 instance {α : Type} [FromElpi α] : FromElpi (List α) where
   tyName := s!"List {FromElpi.tyName α}"
-  decode syms t := decodeList (FromElpi.decode syms) t
+  fromElpi t := decodeList FromElpi.fromElpi t
+instance {α : Type} [FromElpi α] : FromElpi (Array α) where
+  tyName := s!"List {FromElpi.tyName α}"
+  fromElpi t := (decodeList FromElpi.fromElpi t).map List.toArray
 instance {α : Type} [FromElpi α] : FromElpi (Option α) where
   tyName := s!"Option {FromElpi.tyName α}"
-  decode syms
-    | .const c => if c == cNone then some none else none
-    | .app (.const c) #[x] => if c == cSome then (FromElpi.decode syms x).map some else none
-    | _ => none
+  fromElpi
+    | .const c => if c == cNone then .ok none else .error (.mk' "option" (.const c))
+    | .app (.const c) #[x] =>
+      if c == cSome then (FromElpi.fromElpi x).map some else .error (.mk' "option" (.app (.const c) #[x]))
+    | t => .error (.mk' "option" t)
 instance {α β : Type} [FromElpi α] [FromElpi β] : FromElpi (α × β) where
   tyName := s!"{FromElpi.tyName α} × {FromElpi.tyName β}"
-  decode syms
-    | .app (.const c) #[x, y] => if c == cPair then do
-        let a ← FromElpi.decode syms x
-        let b ← FromElpi.decode syms y
+  fromElpi
+    | .app (.const c) #[x, y] =>
+      if c == cPair then do
+        let a ← FromElpi.fromElpi x
+        let b ← FromElpi.fromElpi y
         return (a, b)
-      else none
-    | _ => none
+      else .error (.mk' "pair" (.app (.const c) #[x, y]))
+    | t => .error (.mk' "pair" t)
 
 /-- Decoding the bindings of a solution: one variable through `FromElpi`, several
 variables as a product. -/
 class FromBindings (α : Type) where
   tyName : String
-  decode : Symbols → List (String × Term) → Except ElpiError α
+  decode : List (String × Term) → Except ElpiError α
 
 instance (priority := low) {α : Type} [FromElpi α] : FromBindings α where
   tyName := FromElpi.tyName α
-  decode syms
+  decode
     | [(n, t)] =>
-      match FromElpi.decode syms t with
-      | some a => .ok a
-      | none => .error (.runtime s!"cannot decode variable {n} as {FromElpi.tyName α}")
+      match FromElpi.fromElpi t with
+      | .ok a => .ok a
+      | .error _ => .error (.runtime s!"cannot decode variable {n} as {FromElpi.tyName α}")
     | bs => .error (.runtime s!"expected one answer variable, found {bs.length}")
 
 instance {α β : Type} [FromElpi α] [FromBindings β] : FromBindings (α × β) where
   tyName := s!"{FromElpi.tyName α} × {FromBindings.tyName β}"
-  decode syms
+  decode
     | (n, t) :: rest =>
-      match FromElpi.decode syms t with
-      | some a => (FromBindings.decode syms rest).map (a, ·)
-      | none => .error (.runtime s!"cannot decode variable {n} as {FromElpi.tyName α}")
+      match FromElpi.fromElpi t with
+      | .ok a => (FromBindings.decode rest).map (a, ·)
+      | .error _ => .error (.runtime s!"cannot decode variable {n} as {FromElpi.tyName α}")
     | [] => .error (.runtime "no answer variables")
 
 /-- Run a query and decode the answer variables into a Lean value. -/
@@ -461,12 +527,21 @@ where
     | .nil => .nil
     | .cons (.error e) tl => .cons (.error e) (Thunk.mk fun _ => go tl.get)
     | .cons (.ok s) tl =>
-      .cons (FromBindings.decode s.syms s.bindings) (Thunk.mk fun _ => go tl.get)
+      .cons (FromBindings.decode s.bindings) (Thunk.mk fun _ => go tl.get)
+
+
+/-- The binding of a query variable, decoded into a Lean value. -/
+def Solution.get? {α : Type} [FromElpi α] (s : Solution) (n : String) : Option α :=
+  match s.bindings.lookup n with
+  | some t => (FromElpi.fromElpi t).toOption
+  | none => none
 
 /-! ### Encoding -/
 
 class ToElpi (α : Type) where
-  encode : α → Term
+  toElpi : α → Term
+
+export ToElpi (toElpi)
 
 instance : ToElpi Int := ⟨fun i => .lit (.int i)⟩
 instance : ToElpi Nat := ⟨fun i => .lit (.int i)⟩
@@ -475,11 +550,25 @@ instance : ToElpi Float := ⟨fun f => .lit (.float f)⟩
 instance : ToElpi Bool := ⟨fun b => .const (if b then cTT else cFF)⟩
 instance : ToElpi Term := ⟨id⟩
 instance {α : Type} [ToElpi α] : ToElpi (List α) :=
-  ⟨fun l => l.foldr (fun x acc => .app (.const cCons) #[ToElpi.encode x, acc]) (.const cNil)⟩
+  ⟨fun l => l.foldr (fun x acc => .app (.const cCons) #[ToElpi.toElpi x, acc]) (.const cNil)⟩
+instance {α : Type} [ToElpi α] : ToElpi (Array α) :=
+  ⟨fun l => l.toList.foldr (fun x acc => .app (.const cCons) #[ToElpi.toElpi x, acc]) (.const cNil)⟩
 instance {α : Type} [ToElpi α] : ToElpi (Option α) :=
-  ⟨fun | none => .const cNone | some x => .app (.const cSome) #[ToElpi.encode x]⟩
+  ⟨fun | none => .const cNone | some x => .app (.const cSome) #[ToElpi.toElpi x]⟩
 instance {α β : Type} [ToElpi α] [ToElpi β] : ToElpi (α × β) :=
-  ⟨fun (a, b) => .app (.const cPair) #[ToElpi.encode a, ToElpi.encode b]⟩
+  ⟨fun (a, b) => .app (.const cPair) #[ToElpi.toElpi a, ToElpi.toElpi b]⟩
+
+/-- The ELPI `int` range (63-bit signed). -/
+def elpiIntMin : Int := -(2 ^ 62)
+def elpiIntMax : Int := 2 ^ 62 - 1
+
+/-- Range-checked encoding of numbers: outside the ELPI `int` range it is an error, not a
+wrapped value. -/
+def encodeInt (i : Int) : Except String Term :=
+  if elpiIntMin ≤ i && i ≤ elpiIntMax then .ok (.lit (.int i))
+  else .error s!"integer {i} is outside the range of the ELPI int type"
+
+def encodeNat (n : Nat) : Except String Term := encodeInt n
 
 /-! ### Extending programs -/
 
@@ -542,16 +631,16 @@ returns the list of alternatives. -/
 def CompiledProgram.withFn1 {α β : Type} [FromElpi α] [ToElpi β] (p : CompiledProgram)
     (name sigSrc : String) (f : α → List β) : Except ElpiError CompiledProgram :=
   p.withBuiltin name sigSrc fun args =>
-    match FromElpi.decode p.syms args[0]! with
-    | some a => LazyList.ofList (f a |>.map fun b => #[ToElpi.encode b])
-    | none => .nil
+    match FromElpi.fromElpi args[0]! with
+    | .ok a => LazyList.ofList (f a |>.map fun b => #[ToElpi.toElpi b])
+    | .error _ => .nil
 
 /-- Run a query in an arbitrary host monad, collecting up to `limit` solutions. The
 builtins in `extra` are available in addition to the core ones. -/
-def runIn {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [Output m]
-    (p : CompiledProgram) (q : String) (extra : List (Builtin m) := [])
-    (limit : Nat := 1000) (fuel : Nat := defaultFuel) : m (Except ElpiError (List Solution)) := do
-  match p.prepare q fuel with
+def runPrepared {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [Output m]
+    (p : CompiledProgram) (prepE : Except ElpiError Prepared) (extra : List (Builtin m) := [])
+    (limit : Nat := 1000) : m (Except ElpiError (List Solution)) := do
+  match prepE with
   | .error e => return .error e
   | .ok prep =>
     let base := p.env m prep.syms
@@ -571,6 +660,11 @@ def runIn {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [Output
       | .outOfFuel => return .error .outOfFuel
       | .error e => return .error e
     return .ok out.toList
+
+def runIn {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [Output m]
+    (p : CompiledProgram) (q : String) (extra : List (Builtin m) := [])
+    (limit : Nat := 1000) (fuel : Nat := defaultFuel) : m (Except ElpiError (List Solution)) :=
+  runPrepared p (p.prepare q fuel) extra limit
 
 /-- Quote a command-line argument as an ELPI string literal. -/
 def quoteArg (s : String) : String :=

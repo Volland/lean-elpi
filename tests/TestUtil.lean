@@ -76,4 +76,25 @@ def withTmp {α : Type} (act : System.FilePath → IO α) : IO α := do
   IO.FS.createDirAll base
   try act base finally IO.FS.removeDirAll base
 
+
+unsafe def enableInitUnsafe : IO Unit := Lean.enableInitializersExecution
+
+@[implemented_by enableInitUnsafe] opaque enableInit : IO Unit
+
+/-- Elaborate Lean source text (with its `import` header) and return the messages with their
+positions: `(severity, line, column, text)`. -/
+def elabSource (src : String) (fileName : String := "<test>") :
+    IO (List (Lean.MessageSeverity × Nat × Nat × String)) := do
+  Lean.initSearchPath (← Lean.findSysroot)
+  enableInit
+  let inputCtx := Lean.Parser.mkInputContext src fileName
+  let (header, parserState, messages) ← Lean.Parser.parseHeader inputCtx
+  let (env, messages) ← Lean.Elab.processHeader header {} messages inputCtx
+  let cmdState := Lean.Elab.Command.mkState env messages {}
+  let s ← Lean.Elab.IO.processCommands inputCtx parserState cmdState
+  let mut out := []
+  for m in s.commandState.messages.toList do
+    out := out ++ [(m.severity, m.pos.line, m.pos.column, ← m.data.toString)]
+  return out
+
 end TestUtil

@@ -1,0 +1,138 @@
+% Derivers for BEq, DecidableEq and Repr on inductive types without parameters or indices,
+% written in ELPI. Each one builds the instance as Lean source, elaborates it with
+% `lean.elab` and adds it with `lean.add_decl`; the Lean kernel checks the result.
+% Load with `accumulate lean.derive.`; the exported command is `elpi_derive <Class> <Type>`.
+% @tg: implements:: [[openspec:elpi-libraries#Derive library]]
+accumulate lean.
+
+% main entry of the `elpi_derive` command
+pred main i:list argument.
+main [trm (const Cls _), trm (const Ty _)] :- !, lean.derive Cls Ty.
+main _ :- lean.error "elpi_derive expects a class and a type, e.g. elpi_derive BEq Color".
+
+pred lean.derive i:name, i:name.
+lean.derive Cls Ty :-
+  lean.name->string Cls C,
+  lean.name->string Ty T,
+  lean.env.find Ty Info,
+  lean.derive.info C T Info Cs,
+  lean.derive.dispatch C T Ty Cs.
+
+% the shape of the type: no parameters, constructors only
+pred lean.derive.info i:string, i:string, i:info, o:list ctorinfo.
+lean.derive.info _ _ (inductinfo Cs 0) Cs :- !.
+lean.derive.info C T (inductinfo _ _) _ :- !,
+  Msg is "elpi_derive " ^ C ^ ": " ^ T ^ " has parameters, which are not supported",
+  lean.error Msg.
+lean.derive.info C T _ _ :-
+  Msg is "elpi_derive " ^ C ^ ": " ^ T ^ " is not an inductive type",
+  lean.error Msg.
+
+pred lean.derive.dispatch i:string, i:string, i:name, i:list ctorinfo.
+lean.derive.dispatch "BEq" T Ty Cs :- !, lean.derive.beq T Ty Cs.
+lean.derive.dispatch "Repr" T Ty Cs :- !, lean.derive.repr T Ty Cs.
+lean.derive.dispatch "DecidableEq" T Ty Cs :- !, lean.derive.deceq T Ty Cs.
+lean.derive.dispatch C _ _ _ :-
+  Msg is "elpi_derive: the class " ^ C ^ " is not supported (supported: BEq, DecidableEq, Repr)",
+  lean.error Msg.
+
+% ---- source text helpers ---------------------------------------------------------------
+
+% " x1 x2 x3" for a prefix and a count
+pred lean.derive.vars i:string, i:int, o:string.
+lean.derive.vars P N S :- std.iota N L, lean.derive.vars-aux P L S.
+
+pred lean.derive.vars-aux i:string, i:list int, o:string.
+lean.derive.vars-aux _ [] "".
+lean.derive.vars-aux P [I|Is] S :-
+  J is I + 1, IS is int_to_string J,
+  lean.derive.vars-aux P Is R,
+  S is " " ^ P ^ IS ^ R.
+
+% "x1 == y1 && x2 == y2" (or "true")
+pred lean.derive.conj i:int, o:string.
+lean.derive.conj 0 "true" :- !.
+lean.derive.conj N S :- std.iota N L, lean.derive.conj-aux L S.
+
+pred lean.derive.conj-aux i:list int, o:string.
+lean.derive.conj-aux [I] S :- !, J is I + 1, IS is int_to_string J, S is "x" ^ IS ^ " == y" ^ IS.
+lean.derive.conj-aux [I|Is] S :-
+  J is I + 1, IS is int_to_string J,
+  lean.derive.conj-aux Is R,
+  S is "x" ^ IS ^ " == y" ^ IS ^ " && " ^ R.
+
+pred lean.derive.inst-name i:string, i:string, o:name.
+lean.derive.inst-name C T N :- S is "inst" ^ C ^ T, lean.string->name S N.
+
+% elaborate the class applied to the type, then the instance value against it
+pred lean.derive.add i:string, i:string, i:string, i:string.
+lean.derive.add C T Ty Src :-
+  Cls is C ^ " " ^ Ty,
+  lean.elab Cls Any ClsTy,
+  lean.elab Src ClsTy Val,
+  lean.derive.inst-name C T Name,
+  lean.add_decl (lean.inst Name ClsTy Val).
+
+% ---- BEq ---------------------------------------------------------------------------------
+
+pred lean.derive.beq i:string, i:name, i:list ctorinfo.
+lean.derive.beq T Ty Cs :-
+  lean.name->string Ty TyS,
+  lean.derive.beq-arms Cs Arms,
+  Src is "⟨fun a b => match a, b with\n" ^ Arms ^ "⟩",
+  lean.derive.add "BEq" T TyS Src.
+
+pred lean.derive.beq-arms i:list ctorinfo, o:string.
+lean.derive.beq-arms [] "  | _, _ => false\n".
+lean.derive.beq-arms [ctorinfo C N|Cs] S :-
+  lean.name->string C CS,
+  lean.derive.vars "x" N XS, lean.derive.vars "y" N YS,
+  lean.derive.conj N Conj,
+  lean.derive.beq-arms Cs R,
+  S is "  | @" ^ CS ^ XS ^ ", @" ^ CS ^ YS ^ " => " ^ Conj ^ "\n" ^ R.
+
+% ---- Repr --------------------------------------------------------------------------------
+
+pred lean.derive.repr i:string, i:name, i:list ctorinfo.
+lean.derive.repr T Ty Cs :-
+  lean.name->string Ty TyS,
+  lean.derive.repr-arms Cs Arms,
+  Src is "⟨fun x prec => match x with\n" ^ Arms ^ "⟩",
+  lean.derive.add "Repr" T TyS Src.
+
+pred lean.derive.repr-arms i:list ctorinfo, o:string.
+lean.derive.repr-arms [] "".
+lean.derive.repr-arms [ctorinfo C N|Cs] S :-
+  lean.name->string C CS,
+  lean.derive.vars "x" N XS,
+  lean.derive.repr-fields N Fields,
+  lean.derive.repr-arms Cs R,
+  ( N = 0, !, Body is "Std.Format.text \"" ^ CS ^ "\""
+  ; Body is "Repr.addAppParen (Std.Format.text \"" ^ CS ^ "\"" ^ Fields ^ ") prec" ),
+  S is "  | @" ^ CS ^ XS ^ " => " ^ Body ^ "\n" ^ R.
+
+pred lean.derive.repr-fields i:int, o:string.
+lean.derive.repr-fields N S :- std.iota N L, lean.derive.repr-fields-aux L S.
+
+pred lean.derive.repr-fields-aux i:list int, o:string.
+lean.derive.repr-fields-aux [] "".
+lean.derive.repr-fields-aux [I|Is] S :-
+  J is I + 1, IS is int_to_string J,
+  lean.derive.repr-fields-aux Is R,
+  S is " ++ Std.Format.text \" \" ++ reprArg x" ^ IS ^ R.
+
+% ---- DecidableEq (enumerations) -------------------------------------------------------------
+
+pred lean.derive.deceq i:string, i:name, i:list ctorinfo.
+lean.derive.deceq T Ty Cs :-
+  lean.derive.all-nullary Cs,
+  lean.name->string Ty TyS,
+  Src is "fun a b => by cases a <;> cases b <;> first | exact isTrue rfl | exact isFalse (by intro h; cases h)",
+  lean.derive.add "DecidableEq" T TyS Src.
+lean.derive.deceq T _ _ :-
+  Msg is "elpi_derive DecidableEq: " ^ T ^ " is not an enumeration (only enumerations are supported)",
+  lean.error Msg.
+
+pred lean.derive.all-nullary i:list ctorinfo.
+lean.derive.all-nullary [].
+lean.derive.all-nullary [ctorinfo _ 0|Cs] :- lean.derive.all-nullary Cs.

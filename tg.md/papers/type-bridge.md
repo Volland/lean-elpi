@@ -314,3 +314,9 @@ classDiagram
 ```
 
 `Expr` and `Term` are related by reflection and reification ([[components#Expr reflection]]); levels inside both are carried by `LevelHandle`; `ToElpi` and `FromElpi` move ordinary data ([[components#Marshalling]]); and `DeriveHandler` writes instances and ELPI signatures for user types.
+
+## As built in M3
+
+The marshalling classes, `deriving Elpi` and the rule DSL as implemented in `Elpi/`.
+
+`ToElpi` and `FromElpi` live in `Elpi/Runtime/Api.lean` with instances for the base types, lists, arrays, options and pairs, and `Elpi/Lean/Marshal.lean` adds `Name`, `Level` and `Expr`. Decoding returns a `DecodeError` naming the expected ELPI type and the offending term. `deriving Elpi` generates `ToElpi`/`FromElpi` for an inductive type or a structure without parameters and registers its `kind` and `type` declarations in an environment extension, so programs loaded in that environment can use them; a field type without an instance or a clashing constant name is an error at the `deriving` clause. `elpi_rules` reuses those declarations to type a rule set against Lean types (`elpi-runtime-library › Typed rule DSL`).

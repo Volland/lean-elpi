@@ -36,6 +36,8 @@ inductive Literal where
 structure Opaque where
   handle : Nat
   typeName : String
+  /-- Canonical encoding of the host value; equal data means equal values. -/
+  data : String := ""
   deriving BEq, Hashable, Repr, Inhabited
 
 -- @tg: implements:: [[openspec:elpi-core-engine#Term representation]]

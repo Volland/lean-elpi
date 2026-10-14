@@ -14,8 +14,10 @@ import Elpi.LF.ProofTerm
 import Elpi.LF.Strategy
 import Elpi.Lean.Builtins
 import Elpi.Lean.Commands
+import Elpi.Lean.Derive
 import Elpi.Lean.Libraries
 import Elpi.Lean.Marshal
+import Elpi.Lean.Quote
 import Elpi.Lean.Reflect
 import Elpi.Lean.Tactic
 import Elpi.Runtime.Api

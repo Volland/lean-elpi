@@ -1,0 +1,88 @@
+% Tactic combinators for LeanElpi, in ELPI. Load with `accumulate lean.ltac.`
+% @tg: implements:: [[openspec:elpi-libraries#Tactic combinator library]]
+accumulate lean.
+
+typeabbrev tactic (goal -> list goal -> prop).
+
+% ---- basic tactics -----------------------------------------------------------------
+
+% intro: the new hypothesis is a fresh free variable, abstracted when the proof is reified.
+pred lean.ltac.intro i:string, i:goal, o:list goal.
+lean.ltac.intro Name (goal Ctx P (forall B T F)) [goal [decl X N T|Ctx] P1 (F X)] :-
+  lean.string->name Name N,
+  lean.fresh-fvar Name X, X = fvar FV,
+  lean.binder-named Name B B1,
+  P = lean.lam-fvar FV B1 T P1.
+
+pred lean.ltac.exact i:term, i:goal, o:list goal.
+lean.ltac.exact Term (goal _ P Ty) [] :-
+  lean.infer Term T,
+  lean.defeq T Ty,
+  P = Term.
+
+pred lean.ltac.refine i:term, i:goal, o:list goal.
+lean.ltac.refine Term G Gs :- lean.ltac.exact Term G Gs.
+
+pred lean.ltac.assumption i:goal, o:list goal.
+lean.ltac.assumption (goal Ctx P Ty) [] :-
+  std.mem Ctx (decl X _ T),
+  lean.defeq T Ty, !,
+  P = X.
+
+% apply: open a Lean metavariable for every argument of the function and return the ones
+% that the unification with the goal left unassigned.
+pred lean.ltac.apply i:term, i:goal, o:list goal.
+lean.ltac.apply Fn (goal Ctx P Ty) Gs :-
+  lean.infer Fn FnTy,
+  lean.ltac.apply-aux Fn FnTy Ctx Ty P [] Ms,
+  lean.ltac.open-goals Ctx Ms Gs.
+
+pred lean.ltac.apply-aux i:term, i:term, i:list decl, i:term, o:term, i:list term, o:list term.
+lean.ltac.apply-aux Fn (forall _ A B) Ctx Ty P Acc Ms :- !,
+  lean.mk_mvar A M,
+  lean.mk_app Fn [M] Fn1,
+  std.append Acc [M] Acc1,
+  lean.ltac.apply-aux Fn1 (B M) Ctx Ty P Acc1 Ms.
+lean.ltac.apply-aux Fn Res _ Ty Fn Ms Ms :- lean.defeq Res Ty.
+
+pred lean.ltac.open-goals i:list decl, i:list term, o:list goal.
+lean.ltac.open-goals _ [] [].
+lean.ltac.open-goals Ctx [M|Ms] Gs :-
+  lean.inst-mvars M M1,
+  lean.infer M TyM,
+  lean.ltac.open-goals Ctx Ms Gs1,
+  lean.ltac.cons-open Ctx M1 TyM Gs1 Gs.
+
+pred lean.ltac.cons-open i:list decl, i:term, i:term, i:list goal, o:list goal.
+lean.ltac.cons-open Ctx (mvar Id) Ty Gs1 [goal Ctx (mvar Id) Ty|Gs1] :- !.
+lean.ltac.cons-open _ _ _ Gs Gs.
+
+% ---- combinators ----------------------------------------------------------------------
+
+pred lean.ltac.then i:tactic, i:tactic, i:goal, o:list goal.
+lean.ltac.then T1 T2 G Gs :-
+  T1 G Gs1,
+  std.map Gs1 T2 Gss,
+  std.flatten Gss Gs.
+
+pred lean.ltac.thenl i:tactic, i:list tactic, i:goal, o:list goal.
+lean.ltac.thenl T Ts G Gs :-
+  T G Gs1,
+  std.length Gs1 N,
+  std.length Ts N,
+  std.map2 Ts Gs1 (t\ g\ r\ t g r) Gss,
+  std.flatten Gss Gs.
+
+pred lean.ltac.orelse i:tactic, i:tactic, i:goal, o:list goal.
+lean.ltac.orelse T1 _ G Gs :- T1 G Gs, !.
+lean.ltac.orelse _ T2 G Gs :- T2 G Gs.
+
+pred lean.ltac.try i:tactic, i:goal, o:list goal.
+lean.ltac.try T G Gs :- lean.ltac.orelse T (g\ r\ r = [g]) G Gs.
+
+pred lean.ltac.repeat i:tactic, i:goal, o:list goal.
+lean.ltac.repeat T G Gs :- T G Gs1, !, std.map Gs1 (lean.ltac.repeat T) Gss, std.flatten Gss Gs.
+lean.ltac.repeat _ G [G].
+
+pred lean.ltac.focus i:tactic, i:goal, o:list goal.
+lean.ltac.focus T G [] :- T G [].

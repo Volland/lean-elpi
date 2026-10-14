@@ -1,5 +1,5 @@
 ---
-openspec: [lean-integration, elpi-runtime-library, elpi-cli, elpi-libraries]
+openspec: [lean-integration, lean-reflection, elpi-runtime-library, elpi-cli, elpi-libraries]
 ---
 # Using Lean and ELPI Together
 
@@ -426,3 +426,15 @@ The same exchange at the component level is [[uml#Tactic sequence]]; a query fro
 The engine is shared and only the host monad and entry point change between a tactic, a pure Lean function, the CLI and a compiled executable.
 
 That uniformity is the payoff of [[decisions#Native Lean engine]] and [[decisions#Monad-generic core and packaging]]: a predicate tested with `lean-elpi -test` against the oracle behaves the same inside a tactic, and a solver registered once ([[solvers]]) is available everywhere. Lean terms enter ELPI as plain data ([[decisions#Plain types with reflected Lean terms]]), so dependent typing stays Lean's job, through `lean.infer` and `lean.defeq` at run time and through the kernel when a proof is assigned. For proof search whose results Lean certifies independently, see [[certified-lf]].
+
+## As built in M3
+
+The Lean surface follows the design with a few concrete choices that are worth knowing when reading `Elpi/Lean/`.
+
+**Reflection.** `Reflect.toTerm` maps an `Expr` to the HOAS `term` of `lib/elpi/lean.elpi`; the constructors have fixed `ConstId`s, so no symbol table is needed. Names, binders, levels, metadata and free-variable and metavariable ids are opaque values whose canonical string encoding is their identity, which is why structurally equal levels share a handle and `max u v` and `max v u` do not unify (see `lean-reflection › Opaque universe levels`). Non-reserved ELPI constants get an id that is a hash of their name, so `deriving Elpi` can encode Lean values without a symbol table.
+
+**Programs.** `elpi_program P` and `elpi_db D` declare names in an environment extension; `elpi_accumulate` parses, elaborates the quotations of and typechecks a source, and stores the ready declarations, so importing a module replays entries and nothing is parsed again. Inline `lp%{ … }%` sources keep their Lean positions: ELPI diagnostics are underlined at the token, exactly, with tabs, CRLF and non-ASCII text.
+
+**Quotations.** `{{ t }}` is elaborated when the source is accumulated. `lp:{{X}}` becomes a uniquely named hole, and after elaboration each hole is linked to the ELPI variable `X`; other metavariables, such as implicit arguments, become fresh ELPI variables.
+
+**Tactics.** `elpi_tactic` registers a program; `by elpi name args` reflects the context and target, runs `solve` in `MetaM`, reifies the proof (leftover ELPI variables become metavariables, `lean.lam-fvar` abstracts a hypothesis introduced by `intro` with `mkLambdaFVars`) and assigns the goal only after `isDefEq` accepts it. `elpi_command` and `elpi_export` do the same for commands, and `Elpi.query` runs a query in `MetaM` as a lazy stream. The phase (`query`, `tactic`, `command`, `runtime`) is fixed per execution and `lean.add_decl` and `lean.db.accumulate` succeed only under commands.

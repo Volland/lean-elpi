@@ -1,0 +1,17 @@
+% Conformance: the structural `copy` of the Lean API library, on an ELPI-declared mirror
+% of the reflected term type (no lean.* builtins).
+% Exercises: elpi-libraries › Lean API library.
+kind tm type.
+type cst string -> tm.
+type app tm -> list tm -> tm.
+type lam (tm -> tm) -> tm.
+
+pred copy i:tm, o:tm.
+copy (cst S) (cst S).
+copy (app H As) (app H1 As1) :- copy H H1, std.map As copy As1.
+copy (lam F) (lam F1) :- pi x\ copy x x => copy (F x) (F1 x).
+
+main :-
+  copy (app (cst "f") [cst "a", lam x\ app x [cst "b"]]) T, print T,
+  % extend copy with a clause that renames a constant
+  (pi c\ copy (cst "a") (cst "z") => copy (app (cst "f") [cst "a", cst "b"]) U), print U.

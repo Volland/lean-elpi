@@ -274,3 +274,29 @@ An undeclared constant is reported when it is used where a concrete type is expe
 
 - status:: accepted
 - motivated_by:: [[decisions#ELPI 1.18 dialect]]
+
+## Constants are named by hash
+
+Every non-reserved ELPI constant gets an id that is a hash of its name, so a `ConstId` means the same in every program and Lean values can be encoded without a symbol table.
+
+**Context.** `deriving Elpi` has to build `Term`s in `ToElpi` instances, and instances are compiled once while programs intern their constants in whatever order they meet them.
+
+**Decision.** The reserved control and reflection constants keep small fixed ids; any other name gets `1048576 + hash(name) mod 2^40`, probed to the next free id in the rare case of a collision inside one program.
+
+**Consequences.** Compiled programs can be rebuilt from plain data without remapping, and constructors of derived types are the same constants everywhere. A collision between two names of one program is resolved by probing, so a program that mixes two colliding names is still correct.
+
+- status:: accepted
+- motivated_by:: [[decisions#Monad-generic core and packaging]]
+
+## Goals returned to Lean share the goal's context
+
+A tactic's returned goals are created in the local context of the goal plus the free variables their hypotheses introduce; ELPI eigenvariables cannot be returned.
+
+**Context.** `solve` returns `list goal`, and a `goal` is a closed term; an ELPI `pi`-bound variable of a deeper scope cannot leave its scope.
+
+**Decision.** Hypotheses introduced by `lean.ltac.intro` are fresh free variables (`lean.fresh-fvar`), the proof is built with the pseudo-constructor `lean.lam-fvar`, and the bridge reifies it with `mkLambdaFVars` so that metavariables in the body get their delayed assignments.
+
+**Consequences.** `intro` composes with other tactics through ordinary `list goal` results. The cost is that the bridge, not ELPI, knows about the binder, which is recorded as a pseudo-constructor in `lean.elpi`.
+
+- status:: accepted
+- motivated_by:: [[constraints#Kernel is the trust anchor]]
