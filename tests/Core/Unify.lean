@@ -25,7 +25,7 @@ open Elpi TestUtil
     match r with
     | .ok s =>
       n := n + 1
-      expectEq s.residual.length 1 "residual delayed goals"
+      expectEq s.constraints.length 1 "residual delayed goals"
       match s.bindings.lookup "X" with
       | some (.uvar _ _) => pure ()
       | _ => fail "X must stay unassigned"

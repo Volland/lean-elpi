@@ -111,6 +111,16 @@ partial def applyAt (f : Term) (args : Array Term) (D : Nat) : Term :=
   | _ => mkApp f args
 end
 
+/-- Rename a stored clause/rule term for use at depth `d`: clause variables become the
+given terms and every bound level moves by `d` (the internal binders of a closed term). -/
+partial def renameCVars (vars : Array Term) (d : Nat) : Term → Term
+  | .bound l => .bound (l + d)
+  | .cvar i args => mkApp vars[i]! (args.map (renameCVars vars d))
+  | .app h as => .app (renameCVars vars d h) (as.map (renameCVars vars d))
+  | .lam b => .lam (renameCVars vars d b)
+  | .uvar u as => .uvar u (as.map (renameCVars vars d))
+  | t => t
+
 /-- Instantiate level `d` of a body living at depth `d+1` with `a` (living at depth `d`). -/
 def instantiate (body : Term) (d : Nat) (a : Term) : Term := subst body d a 0
 

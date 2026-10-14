@@ -1,0 +1,15 @@
+% Conformance: a failing guard prevents firing; a guard may not bind frozen variables.
+% Exercises: elpi-constraints › CHR rules.
+constraint pos {
+  rule \ (pos X N) | (N > 0) <=> true.
+}
+constraint bind {
+  rule \ (bind X) | (X = 1) <=> true.
+}
+
+pred pos o:int, o:int.
+pos X N :- declare_constraint (pos X N) [X].
+pred bind o:int.
+bind X :- declare_constraint (bind X) [X].
+
+main :- pos X 0, pos Y 1, bind Z, print "ok" X Y Z.

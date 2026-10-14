@@ -55,6 +55,15 @@ structure Attrs where
   after : Option String := none
   deriving Inhabited
 
+/-- A CHR rule `rule K… \\ R… | Guard <=> Body`. -/
+structure CHRRuleAst where
+  kept : List STm
+  removed : List STm
+  guard : Option STm
+  body : Option STm
+  pos : Pos
+  deriving Inhabited
+
 inductive Decl where
   | kind (names : List String) (ty : STy) (p : Pos)
   | type (names : List String) (ty : STy) (p : Pos)
@@ -63,6 +72,7 @@ inductive Decl where
   | clause (attrs : Attrs) (t : STm) (p : Pos)
   | accumulate (file : String) (p : Pos)
   | ns (n : String) (ds : List Decl) (p : Pos)
+  | constraint (preds : List String) (rules : List CHRRuleAst) (p : Pos)
   deriving Inhabited
 
 structure ParseError where
@@ -527,7 +537,55 @@ partial def parseDecl : PM Decl := do
     expect .rc
     -- the block is closed by `}` and not followed by a dot
     return .ns name ds t.pos
-  | .ident "macro" | .ident "shorten" | .ident "external" | .ident "constraint"
+  | .ident "constraint" =>
+    advance
+    let mut preds : Array String := #[]
+    repeat
+      let k ← peek
+      match k.tok with
+      | .ident s => advance; preds := preds.push s
+      | _ => break
+    expect .lc
+    let mut rules : Array CHRRuleAst := #[]
+    repeat
+      let k ← peek
+      if k.tok == .rc then break
+      let .ident "rule" := k.tok | fail k.pos "'rule' expected in a constraint block"
+      advance
+      let isEnd (t : Tok) : Bool :=
+        t == .sym "\\" || t == .bar || t == .sym "<=>" || t == .dot
+      let mut first : Array STm := #[]
+      repeat
+        let h ← peek
+        if isEnd h.tok then break
+        first := first.push (← parseAtom)
+      let mut kept := first.toList
+      let mut removed : List STm := []
+      let n1 ← peek
+      if n1.tok == .sym "\\" then
+        advance
+        kept := first.toList
+        let mut second : Array STm := #[]
+        repeat
+          let h ← peek
+          if isEnd h.tok then break
+          second := second.push (← parseAtom)
+        removed := second.toList
+      let mut guard : Option STm := none
+      let n2 ← peek
+      if n2.tok == .bar then
+        advance
+        guard := some (← parseAtom)
+      let mut body : Option STm := none
+      let n3 ← peek
+      if n3.tok == .sym "<=>" then
+        advance
+        body := some (← parseAtom)
+      expect .dot
+      rules := rules.push { kept, removed, guard, body, pos := k.pos }
+    expect .rc
+    return .constraint preds.toList rules.toList t.pos
+  | .ident "macro" | .ident "shorten" | .ident "external"
   | .ident "chr" | .ident "mode" =>
     fail t.pos s!"'{tokDesc t.tok}' is unsupported in this milestone"
   | _ =>
@@ -679,9 +737,8 @@ partial def findConst (name : String) : STm → Option Pos
 
 /-- Features of later milestones are rejected at load time. -/
 def unsupportedFeature (t : STm) : Option (Pos × String) :=
-  match findConst "declare_constraint" t with
-  | some p => some (p, "declare_constraint")
-  | none => none
+  let _ := t
+  none
 
 /-! ### Loading units: accumulate and namespaces -/
 
@@ -736,6 +793,11 @@ partial def flattenNs (scopes : Scopes) (ds : List Decl) : List Decl :=
     | .pred n args p => [.pred (q n) (args.map fun (m, t) => (m, qualTy scopes t)) p]
     | .typeabbrev n ps ty p => [.typeabbrev (q n) ps (qualTy scopes ty) p]
     | .clause a t p => [.clause a (qualTm scopes [] t) p]
+    | .constraint ps rs p =>
+      let qr (r : CHRRuleAst) : CHRRuleAst :=
+        { r with kept := r.kept.map (qualTm scopes []), removed := r.removed.map (qualTm scopes []),
+                 guard := r.guard.map (qualTm scopes []), body := r.body.map (qualTm scopes []) }
+      [.constraint (ps.map q) (rs.map qr) p]
     | d => [d]
 
 /-- Resolve `accumulate` through `find` (file name, requesting file ↦ canonical path and

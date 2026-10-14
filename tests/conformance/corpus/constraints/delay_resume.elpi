@@ -1,0 +1,14 @@
+% Conformance: goals suspend on a variable and resume, in order, right after its assignment.
+% Exercises: elpi-constraints › Delayed goals.
+pred even i:int.
+even N :- 0 is N mod 2, print "even" N.
+
+pred odd i:int.
+odd N :- 1 is N mod 2, print "odd" N.
+
+main :-
+  declare_constraint (even X) [X], print "after",
+  declare_constraint (odd Y) [Y],
+  X = 4, print "done X",
+  Y = 3, print "done Y",
+  (declare_constraint (even Z) [Z], Z = 3, print "bad" ; print "resumed goal failed").

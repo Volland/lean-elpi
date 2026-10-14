@@ -393,3 +393,13 @@ The M1 engine follows the design above with a handful of concrete choices worth 
 **Machine.** A frame carries its goal, depth, hypothetical clauses and cut barrier. Hypothetical clauses added by `=>` are tried before the static ones, newest group first, as in the oracle. A choice point keeps the store, the continuation and the host snapshot; `not G` is `(G, !, fail) ; true` with the cut local to the construct; `findall_solutions` runs a nested machine over the current store and copies the instances out with fresh variables.
 
 **Answers.** The machine returns `Step.yield` with the final store and a resumable machine whose `resume` flag makes the next step backtrack. `Elpi.solve` unfolds this into a `LazyList` in `Id`; `solveIO` and `runIn` run the same loop in `IO` or any `Backtrackable` monad.
+
+## Constraints as built in M2
+
+The constraint store is a field of `Store` (`Store.cstore`), so choice points capture it for free and backtracking needs no compensating code.
+
+**Waking.** `Store.setAssign` looks the assigned variable up in the wake index and pushes the ids of the suspended constraints onto `Store.wakeQueue`; the unifier never runs them. Before it pops the next goal, `stepM` drains the queue (`drainWake`): each woken plain constraint is removed from the store and pushed as a frame in its recorded depth and local program, in wake order. A problem outside the pattern fragment becomes the suspended goal `a = b` keyed on its variables, so the same mechanism resumes it; hooks are consulted first, and only then.
+
+**CHR.** Rule matching is one-way: the rule's variables are fresh, and every variable of the store is protected (`Store.protect`, the same device as match mode for `i:` arguments), so a head can never assign a store variable and a guard, run in a nested machine with the same protection, cannot bind one either. `activate` runs when `declare_constraint` adds a constraint: for each block over its predicate, in source order, each rule and each head position holding the active constraint, partners are taken from the per-predicate index in insertion order and the first match whose guard succeeds fires. Removed heads leave the store at once and bodies are pushed as goals in firing order; a combination fires at most once per activation, which is what keeps propagation rules from looping without a propagation history. A head `(Ctx ?- C)` binds `Ctx` to the recorded local program as a list of clauses.
+
+**Residual.** `RawSolution.constraints` carries the store's constraints with the answer; the CLI prints them on standard error as the oracle does, newest first, and the harness compares that section with whitespace squashed.

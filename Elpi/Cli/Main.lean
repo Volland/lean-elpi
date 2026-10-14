@@ -62,7 +62,7 @@ def runOnceHint (p : CompiledProgram) (q : String) (fuel : Nat) : IO UInt32 := d
   try
     let st ← solveIO p q fuel
     match ← st.next with
-    | some _ => return 0
+    | some sol => reportConstraints sol; return 0
     | none => IO.eprintln "Failure"; return 1
   catch e =>
     IO.eprintln (envHint (toString e))
@@ -80,7 +80,7 @@ def runInMeta (env : _root_.Lean.Environment) (p : CompiledProgram) (q : String)
   let st : _root_.Lean.Core.State := { env }
   let (r, _) ← (act.run' {} {}).toIO ctx st
   match r with
-  | .ok (_ :: _) => return 0
+  | .ok (sol :: _) => reportConstraints sol; return 0
   | .ok [] => IO.eprintln "Failure"; return 1
   | .error e => IO.eprintln s!"{e}"; return 1
 
@@ -123,6 +123,7 @@ partial def repl (p : CompiledProgram) (fuel : Nat) : IO UInt32 := do
             IO.println "Success:"
             for (v, t) in sol.bindings do
               IO.println s!"  {v} = {sol.show t}"
+            for l in sol.constraintLines do IO.println l
             stdout.putStr "More? (y/N) "
             stdout.flush
             let ans ← stdin.getLine

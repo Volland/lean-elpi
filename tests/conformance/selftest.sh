@@ -28,9 +28,11 @@ check() {
 test_every_program_runs_on_both_engines() {
   local log n programs ok=yes
   log="$(LEAN_ELPI="$oracle" CONFORMANCE_DIVERGENCES="$tmp/no-divergences.md" "$run" 2>&1)"
-  programs="$(ls "$here"/corpus/*.elpi | wc -l | tr -d ' ')"
-  for p in "$here"/corpus/*.elpi; do
-    n="$(basename "$p" .elpi)"
+  programs="$(ls "$here"/corpus/*.elpi "$here"/corpus/*/*.elpi 2>/dev/null | grep -v '/lib/' | wc -l | tr -d ' ')"
+  for p in "$here"/corpus/*.elpi "$here"/corpus/*/*.elpi; do
+    [ -f "$p" ] || continue
+    case "$p" in */lib/*) continue ;; esac
+    n="${p#"$here"/corpus/}"; n="${n%.elpi}"; n="${n//\//-}"
     [ -f "$here/out/$n.oracle.status" ] && [ -f "$here/out/$n.lean.status" ] || ok=no
   done
   [ "$(echo "$log" | grep -c -E '^(pass|FAIL|known|stale) ')" = "$programs" ] || ok=no

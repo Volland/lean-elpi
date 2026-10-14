@@ -94,3 +94,5 @@ pred rex.match i:string, i:string.
 pred var i:A.
 pred name i:A.
 pred findall_solutions i:prop, o:list prop.
+type (?-) any -> prop -> prop.
+type declare_constraint prop -> list any -> prop.

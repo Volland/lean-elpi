@@ -16,9 +16,16 @@ def builtinSource : String := include_str "../../lib/elpi/builtin.elpi"
 -- @tg: implements:: [[openspec:elpi-libraries#Standard library]]
 def source : String := include_str "../../lib/elpi/std.elpi"
 
+/-- The `leq` CHR solver (tier T1), loaded with `accumulate leq.` -/
+-- @tg: implements:: [[openspec:elpi-solver-api#CHR solvers in ELPI]]
+def leqSource : String := include_str "../../lib/elpi/leq.elpi"
+
 /-- Libraries embedded in the binary, by accumulate name. -/
 -- @tg: implements:: [[openspec:elpi-libraries#Embedded libraries]]
 def embedded : List (String × String) :=
-  [("std", source), ("builtin", builtinSource)]
+  [("std", source), ("builtin", builtinSource), ("leq", leqSource)]
 
 end Elpi.Std
+-- rebuild marker: bump when lib/elpi/*.elpi change (include_str is not tracked by Lake)
+-- rebuild marker 2
+-- rebuild marker 3

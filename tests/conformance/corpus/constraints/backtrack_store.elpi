@@ -1,0 +1,12 @@
+% Conformance: the constraint store backtracks with the machine.
+% Exercises: elpi-constraints › Backtrackable constraint store.
+pred p i:int.
+p _.
+pred q i:int.
+q N :- print "q" N.
+
+main :-
+  (declare_constraint (p X) [X], fail ; true),
+  declare_constraint (q Y) [Y],
+  (Y = 1, fail ; print "second branch"),
+  Y = 2.

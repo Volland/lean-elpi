@@ -89,7 +89,7 @@ The resolution loop: goal stack, choice-point stack, cut barriers, fuel, lazy so
 
 ## Constraint store
 
-Persistent store of delayed goals keyed by the variables they wait on, the wake-up queue, and slices owned by native handlers. Source: `Elpi/Core/Constraints.lean`.
+Persistent store of delayed goals keyed by the variables they wait on, the wake-up queue, and slices owned by native handlers. Source: `Elpi/Core/Constraints.lean`, held in `Store.cstore` so choice points capture it.
 
 - module:: Elpi.Core.Constraints
 - milestone:: M2
@@ -101,7 +101,7 @@ Persistent store of delayed goals keyed by the variables they wait on, the wake-
 
 ## CHR engine
 
-Matches CHR rules against the constraint store, checks guards, removes or keeps constraints and schedules new goals, respecting `pi` scopes. Source: `Elpi/Core/CHR.lean`.
+Matches CHR rules against the constraint store, checks guards, removes or keeps constraints and schedules new goals, respecting `pi` scopes. Source: `Elpi/Core/CHR.lean` (matching) and `activate` in `Elpi/Core/Machine.lean` (guards and firing).
 
 - module:: Elpi.Core.CHR
 - milestone:: M2

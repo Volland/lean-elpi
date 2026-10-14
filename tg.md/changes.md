@@ -24,7 +24,7 @@ Milestone M2: delayed goals, a backtrackable constraint store, CHR, and solver t
 
 Depends on [[changes#add-elpi-core]]. Capabilities: `elpi-constraints`, `elpi-solver-api` (CHR solvers, handlers, hooks). Files: `openspec/changes/add-elpi-constraints/`.
 
-- status:: proposed
+- status:: implemented
 - milestone:: M2
 
 ## add-lean-integration

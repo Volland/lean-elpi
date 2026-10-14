@@ -1,0 +1,6 @@
+% Conformance: unsolved constraints are reported with the answer.
+% Exercises: elpi-constraints › Residual constraints.
+pred even i:int.
+even N :- 0 is N mod 2.
+
+main :- declare_constraint (even X) [X], Y = 2, print Y.

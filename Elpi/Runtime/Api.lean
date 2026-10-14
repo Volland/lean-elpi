@@ -86,6 +86,20 @@ def lowerClause (attrs : Attrs) (t : STm) (pos : Pos) : LM (Option ClauseItem) :
         clause := { head := hd, body := bd, nvars := nv, name? := attrs.name, pos }
         before? := attrs.before, after? := attrs.after }
 
+/-- Lower a CHR rule: all its terms share the rule's variables. -/
+def lowerRule (r : CHRRuleAst) : LM CHRRule := do
+  modify fun s => { s with vars := #[] }
+  let kept ← r.kept.toArray.mapM (lowerTm #[])
+  let removed ← r.removed.toArray.mapM (lowerTm #[])
+  let guard ← r.guard.mapM (lowerTm #[])
+  let body ← r.body.mapM (lowerTm #[])
+  return { kept, removed, guard, body, nvars := (← get).vars.size }
+
+def lowerBlock (preds : List String) (rules : List CHRRuleAst) : LM ConstraintBlock := do
+  let ps ← preds.toArray.mapM internC
+  let rs ← rules.toArray.mapM lowerRule
+  return { preds := ps, rules := rs }
+
 /-! ### Programs -/
 
 structure CompiledProgram where
@@ -96,6 +110,11 @@ structure CompiledProgram where
   modes : Std.HashMap Nat (Array Mode) := {}
   /-- Builtins attached at runtime with `withBuiltin`. -/
   extra : List (Builtin Id) := []
+  /-- CHR blocks, in source order. -/
+  blocks : Array ConstraintBlock := #[]
+  /-- Native constraint handlers (tier T3) and unification hooks (tier T4). -/
+  handlers : List (String × ConstraintHandler) := []
+  hooks : Array UnifHook := #[]
   deriving Inhabited
 
 private def joinErrs (es : List TypeError) : String :=
@@ -119,17 +138,43 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
       if let some (q, what) := unsupportedFeature t then
         throw (.load s!"{q.toString}: '{what}' is unsupported in this milestone")
       clauses := clauses.push (a, elimSpilling t, pos)
-  match Typecheck.checkProgram sig (clauses.toList.map (·.2.1)) none p.definedNames with
+  -- the terms of a CHR rule are checked like one clause body (they share variables)
+  let mut ruleTerms : List STm := []
+  for d in decls do
+    if let .constraint _ rs _ := d then
+      for r in rs do
+        let ts := r.kept ++ r.removed ++ r.guard.toList ++ r.body.toList
+        match ts with
+        | [] => pure ()
+        | t :: more =>
+          ruleTerms := ruleTerms ++ [more.foldl (fun acc x => STm.app (.const "," r.pos) [acc, x] r.pos) t]
+  let known := ruleTerms.foldl (init := p.definedNames) fun s t =>
+    (Typecheck.clauseHead t).elim s s.insert
+  match Typecheck.checkProgram sig (clauses.toList.map (·.2.1) ++ ruleTerms) none known with
   | .error es => throw (.type (joinErrs es))
   | .ok () => pure ()
   let (items, ls) := (clauses.mapM fun (a, t, pos) => lowerClause a t pos).run { syms := p.syms }
   let items := p.items ++ items.filterMap id
   let lists ← graft items
+  let mut ls := ls
+  let mut blocks := p.blocks
+  for d in decls do
+    if let .constraint ps rs _ := d then
+      let (b, ls') := (lowerBlock ps rs).run ls
+      ls := ls'
+      blocks := blocks.push b
+  -- a native handler owns its predicates: CHR blocks over them are rejected
+  for b in blocks do
+    for (hn, h) in p.handlers do
+      for k in h.keys do
+        if let some c := ls.syms.find? k then
+          if b.preds.contains c then
+            throw (.load s!"constraint block over '{k}', which the native handler '{hn}' owns")
   let modes := sig.modes.fold (init := p.modes) fun m n ms =>
     match ls.syms.find? n with
     | some c => m.insert c.idx ms
     | none => m
-  return { p with syms := ls.syms, sig, items, db := Database.ofLists lists, modes }
+  return { p with syms := ls.syms, sig, items, db := Database.ofLists lists, modes, blocks }
 where
   checkSignature' (sig : Signature) (d : Decl) : Except TypeError Signature :=
     Typecheck.checkSignature sig d
@@ -187,7 +232,8 @@ end Program
 in order of first occurrence) and the residual suspended problems. -/
 structure Solution where
   bindings : List (String × Term)
-  residual : List DelayedProblem := []
+  /-- Constraints still suspended when the answer was found (goals fully dereferenced). -/
+  constraints : List Constraint := []
   syms : Symbols
   store : Store
 
@@ -200,6 +246,25 @@ def Solution.toString (s : Solution) : String :=
   ", ".intercalate items
 
 instance : ToString Solution := ⟨Solution.toString⟩
+
+/-- Residual constraints in the oracle's format, newest first: the goal and the variables
+it is suspended on, with the eigenvariables of its scope in front. Variable names are
+shared across the whole list. -/
+-- @tg: implements:: [[openspec:elpi-constraints#Residual constraints]]
+def Solution.constraintLines (s : Solution) : List String :=
+  let act : Print.PM (List String) := do
+    let mut out : List String := []
+    for c in s.constraints.reverse do
+      let g ← Print.pp c.goal c.depth 0 false
+      let ks ← c.keys.toList.filterMapM fun k => do
+        match (← get).store.deref (.uvar k #[]) 0 with
+        | .uvar u _ => return some (← Print.varName u)
+        | _ => return none
+      let scope := if c.depth == 0 then "" else
+        "{" ++ ", ".intercalate ((List.range c.depth).map fun i => s!"c{i}") ++ "} : "
+      out := out ++ [s!" {scope}{g}  /* suspended on {", ".intercalate ks} */"]
+    return out
+  (act.run' { syms := s.syms, store := s.store })
 
 def Solution.find? (s : Solution) (n : String) : Option Term := s.bindings.lookup n
 
@@ -217,6 +282,12 @@ def CompiledProgram.env (p : CompiledProgram) (m : Type → Type) [Monad m] [Out
   let lift (b : Builtin Id) : Builtin m := { sig := b.sig, run := fun c a => pure (b.run c a) }
   let all := core ++ p.extra.map lift
   { syms, db := p.db, modes := p.modes
+    blocks := p.blocks
+    handlers := p.handlers.foldl (init := {}) fun h (n, hd) =>
+      hd.keys.foldl (init := h) fun h k =>
+        match syms.find? k with
+        | some c => h.insert c.idx (n, hd)
+        | none => h
     builtins := all.foldl (init := {}) fun h b =>
       match syms.find? b.sig.name with
       | some c => h.insert c.idx b
@@ -234,7 +305,10 @@ def CompiledProgram.prepare (p : CompiledProgram) (q : String) (fuel : Nat := de
   | .ok () => pure ()
   let (goal, ls) := (lowerTm #[] t').run { syms := p.syms }
   -- query variables become unification variables at level 0
-  let mut store : Store := {}
+  let mut store : Store :=
+    { hooks := p.hooks
+      interp := p.hooks.foldl (init := #[]) fun a h =>
+        h.interpreted.foldl (init := a) fun a n => match ls.syms.find? n with | some c => a.push c.idx | none => a }
   let mut vars : Array Term := #[]
   let mut names : Array (String × UVarId) := #[]
   for n in ls.vars do
@@ -251,7 +325,7 @@ def CompiledProgram.prepare (p : CompiledProgram) (q : String) (fuel : Nat := de
 def mkSolution (syms : Symbols) (names : Array (String × UVarId)) (sol : RawSolution) :
     Solution :=
   { bindings := names.toList.map fun (n, u) => (n, sol.store.zonk (.uvar u #[]) 0)
-    residual := sol.residual, syms, store := sol.store }
+    constraints := sol.constraints.map fun c => { c with goal := sol.store.zonk c.goal c.depth }, syms, store := sol.store }
 
 /-- Run a query purely: a lazy stream of solutions. A resource error or engine error is a
 terminal `Except.error` element, distinguishable from exhaustion. -/
@@ -502,12 +576,20 @@ def runIn {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [Output
 def quoteArg (s : String) : String :=
   "\"" ++ (s.replace "\\" "\\\\").replace "\"" "\\\"" ++ "\""
 
+/-- Print the residual constraints of an answer on standard error, as the oracle does. -/
+def reportConstraints (sol : Solution) : IO Unit := do
+  let ls := sol.constraintLines
+  unless ls.isEmpty do
+    IO.eprintln "Constraints:"
+    for l in ls do IO.eprintln l
+    IO.eprintln "State:"
+
 /-- Run the first solution of a query; exit status 0 on success, 1 on failure or error. -/
 def runOnce (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) : IO UInt32 := do
   try
     let st ← solveIO p q fuel
     match ← st.next with
-    | some _ => return 0
+    | some sol => reportConstraints sol; return 0
     | none =>
       IO.eprintln "Failure"
       return 1
@@ -518,5 +600,22 @@ def runOnce (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) : IO 
 /-- Entry point of compiled executables: run `main [ARGS…]`. -/
 def runMain (p : CompiledProgram) (args : List String) : IO UInt32 :=
   runOnce p s!"main [{", ".intercalate (args.map quoteArg)}]"
+
+/-- Register a native constraint handler (tier T3). A name clash is an error. -/
+def CompiledProgram.withHandler (p : CompiledProgram) (name : String) (h : ConstraintHandler) :
+    Except ElpiError CompiledProgram := do
+  if p.handlers.any (·.1 == name) then throw (.load s!"constraint handler '{name}' is already registered")
+  let (syms, owned) := h.keys.foldl (init := (p.syms, ([] : List ConstId))) fun (sy, os) k =>
+    let (c, sy) := sy.intern k
+    (sy, c :: os)
+  for b in p.blocks do
+    if owned.any b.preds.contains then
+      throw (.load s!"constraint block over a predicate owned by the native handler '{name}'")
+  return { p with syms, handlers := p.handlers ++ [(name, h)] }
+
+/-- Register a unification hook (tier T4); hooks are consulted in registration order. -/
+def CompiledProgram.withHook (p : CompiledProgram) (h : UnifHook) : CompiledProgram :=
+  let syms := h.interpreted.foldl (fun sy n => (sy.intern n).2) p.syms
+  { p with syms, hooks := p.hooks.push h }
 
 end Elpi

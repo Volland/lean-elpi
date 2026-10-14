@@ -21,7 +21,12 @@ inductive Effect where
   | pureFn | ioFn | metaFn
   deriving Inhabited, BEq, Repr
 
+inductive Kind where
+  | builtin | handler | hook
+  deriving Inhabited, BEq, Repr
+
 structure Entry where
+  kind : Kind := .builtin
   name : String
   sigSrc : String
   declName : Name
@@ -86,8 +91,47 @@ initialize elpiBuiltinAttr : Unit ←
           | throwError "elpi_builtin: {declName} must have type `Array Term → LazyList (Array Term)`, optionally in `IO` or `MetaM`"
         modifyEnv fun env => builtinExt.addEntry env { name, sigSrc, declName, effect } }
 
+syntax (name := elpi_constraint_handler) "elpi_constraint_handler " str : attr
+syntax (name := elpi_unif_hook) "elpi_unif_hook" : attr
+
+/-- Register a native constraint handler (tier T3), available in every importing module. -/
+-- @tg: implements:: [[openspec:elpi-solver-api#Native constraint handlers]]
+initialize elpiHandlerAttr : Unit ←
+  registerBuiltinAttribute
+    { ref := by exact decl_name%
+      name := `elpi_constraint_handler
+      descr := "Native constraint handler (tier T3)"
+      applicationTime := .afterCompilation
+      add := fun declName stx _ => do
+        let some name := stx[1].isStrLit? | throwError "elpi_constraint_handler: name must be a string literal"
+        let env ← getEnv
+        if (entries env).any (fun e => e.kind == .handler && e.name == name) then
+          throwError "elpi_constraint_handler: a handler named '{name}' is already registered"
+        let info ← getConstInfo declName
+        unless info.type.isConstOf ``Elpi.ConstraintHandler do
+          throwError "elpi_constraint_handler: {declName} must have type `ConstraintHandler`"
+        modifyEnv fun env =>
+          builtinExt.addEntry env { kind := .handler, name, sigSrc := "", declName, effect := .pureFn } }
+
+/-- Register a unification hook (tier T4). -/
+-- @tg: implements:: [[openspec:elpi-solver-api#Unification hooks]]
+initialize elpiHookAttr : Unit ←
+  registerBuiltinAttribute
+    { ref := by exact decl_name%
+      name := `elpi_unif_hook
+      descr := "Unification hook (tier T4)"
+      applicationTime := .afterCompilation
+      add := fun declName _ _ => do
+        let info ← getConstInfo declName
+        unless info.type.isConstOf ``Elpi.UnifHook do
+          throwError "elpi_unif_hook: {declName} must have type `UnifHook`"
+        modifyEnv fun env =>
+          builtinExt.addEntry env
+            { kind := .hook, name := declName.toString, sigSrc := "", declName, effect := .pureFn } }
+
 /-- Signature sources of the registered builtins, to be loaded with a program. -/
-def signatures (env : Environment) : List String := (entries env).toList.map (·.sigSrc)
+def signatures (env : Environment) : List String :=
+  ((entries env).toList.filter (·.kind == .builtin)).map (·.sigSrc)
 
 unsafe def evalImplUnsafe {α : Type} (env : Environment) (opts : Options) (n : Name) :
     Except String α := env.evalConst α opts n
@@ -104,7 +148,7 @@ def modesOf (e : Entry) : Except String (Array Mode) := do
 /-- The pure implementations of the registered builtins, as `Builtin Id` values. -/
 def pureBuiltins (env : Environment) (opts : Options := {}) : Except String (List (Builtin Id)) := do
   let mut out := []
-  for e in entries env do
+  for e in (entries env).filter (·.kind == .builtin) do
     if e.effect == .pureFn then
       let f : Array Term → LazyList (Array Term) ← evalImpl env opts e.declName
       let modes ← modesOf e
@@ -115,7 +159,7 @@ def pureBuiltins (env : Environment) (opts : Options := {}) : Except String (Lis
 /-- Builtins usable in `IO` (pure and `IO` implementations). -/
 def ioBuiltins (env : Environment) (opts : Options := {}) : Except String (List (Builtin IO)) := do
   let mut out := []
-  for e in entries env do
+  for e in (entries env).filter (·.kind == .builtin) do
     let modes ← modesOf e
     let sig : BuiltinSig := { name := e.name, modes, type := .con "any" [] }
     match e.effect with
@@ -132,7 +176,7 @@ def ioBuiltins (env : Environment) (opts : Options := {}) : Except String (List 
 def metaBuiltins (env : Environment) (opts : Options := {}) :
     Except String (List (Builtin Meta.MetaM)) := do
   let mut out : List (Builtin Meta.MetaM) := []
-  for e in entries env do
+  for e in (entries env).filter (·.kind == .builtin) do
     let modes ← modesOf e
     let sig : BuiltinSig := { name := e.name, modes, type := .con "any" [] }
     match e.effect with
@@ -148,11 +192,23 @@ def metaBuiltins (env : Environment) (opts : Options := {}) :
   return out
 
 /-- Load a program in an environment: it sees exactly the builtins registered there. -/
-def loadIn (env : Environment) (src : String) : Except ElpiError CompiledProgram := do
-  let p ← Program.loadWith (signatures env) src
+def loadIn (env : Environment) (src : String) (extraSigs : List String := []) :
+    Except ElpiError CompiledProgram := do
+  let p ← Program.loadWith (signatures env ++ extraSigs) src
   let bs ← match pureBuiltins env with
     | .ok bs => pure bs
     | .error e => throw (.load e)
-  return { p with extra := bs ++ p.extra }
+  let mut p : CompiledProgram := { p with extra := bs ++ p.extra }
+  for e in (entries env).filter (·.kind == .handler) do
+    let h : ConstraintHandler ← match evalImpl env {} e.declName with
+      | .ok h => pure h
+      | .error m => throw (.load m)
+    p ← p.withHandler e.name h
+  for e in (entries env).filter (·.kind == .hook) do
+    let h : UnifHook ← match evalImpl env {} e.declName with
+      | .ok h => pure h
+      | .error m => throw (.load m)
+    p := p.withHook h
+  return p
 
 end Elpi.Registry

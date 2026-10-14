@@ -12,3 +12,11 @@ fails and `main` exits with status 1). LeanElpi follows the requirement
 `elpi-core-engine › Higher-order pattern unification`: the problem is suspended,
 re-checked once `Y` is assigned, and the query succeeds. Debt against the
 requirement text, which asks for both the suspension and "the oracle's answer".
+
+## constraints-stuck_unif
+
+Without `-delay-problems-outside-pattern-fragment` the oracle aborts with a fatal error
+on `F a = g a`. LeanElpi follows the requirement `elpi-constraints › Delayed goals`
+("problems outside the pattern fragment SHALL be suspended through the same mechanism")
+and `elpi-core-engine › Higher-order pattern unification`: the problem becomes a
+suspended goal keyed on `F` and is reported as a residual constraint.

@@ -165,6 +165,10 @@ stateDiagram-v2
     Solve --> OutOfFuel: fuel = 0
     Solve --> SelectClause: atomic goal (index lookup)
     Solve --> RunBuiltin: builtin goal
+    Solve --> DrainWake: wake queue not empty (before the next goal)
+    DrainWake --> Solve: woken goals pushed in wake order
+    Solve --> Declare: declare_constraint
+    Declare --> Solve: stored; CHR rules fired, bodies pushed
     Solve --> Solve: conjunction / pi / sigma / implication / spilled call
     Solve --> PushChoicePoint: disjunction
     Solve --> Cut: goal is !

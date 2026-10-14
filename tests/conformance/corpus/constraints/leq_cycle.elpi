@@ -1,0 +1,13 @@
+% Conformance: a leq solver collapses a cycle.
+% Exercises: elpi-solver-api › CHR solvers in ELPI.
+constraint leq {
+  rule \ (leq X X).
+  rule (leq X Y) \ (leq X Y).
+  rule (leq X Y) \ (leq Y X) <=> (X = Y).
+  rule (leq X Y) (leq Y Z) <=> (leq X Z).
+}
+
+pred leq o:int, o:int.
+leq A B :- declare_constraint (leq A B) [A, B].
+
+main :- leq A B, leq B C, leq C A, print A B C.

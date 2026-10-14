@@ -1,6 +1,7 @@
 import Lean.Data.PersistentHashMap
 import Lean.Data.PersistentArray
 import Elpi.Core.Term
+import Elpi.Core.Constraints
 
 /-!
 # Persistent substitution
@@ -20,19 +21,19 @@ structure UVarInfo where
   name? : Option String := none
   deriving Inhabited
 
-/-- A problem outside the pattern fragment, suspended until its head is assigned. -/
-structure DelayedProblem where
-  depth : Nat
-  lhs : Term
-  rhs : Term
-  deriving Inhabited
-
 -- @tg: implements:: [[openspec:elpi-core-engine#Persistent store]]
 structure Store where
   assign  : Lean.PersistentHashMap UVarId Term := {}
   info    : Lean.PersistentArray UVarInfo := {}
   nextVar : Nat := 0
-  delayed : List DelayedProblem := []
+  cstore  : ConstraintStore := {}
+  /-- Constraints woken by assignments, oldest last (id, variable). -/
+  wakeQueue : List (Nat × UVarId) := []
+  /-- Variables with an index below this are frozen (CHR matching and guards). -/
+  protect : Nat := 0
+  hooks : Array UnifHook := #[]
+  /-- Constants (by index) that hooks treat as interpreted. -/
+  interp : Array Nat := #[]
   /-- Print names (`X0`, `X1`, …) handed out so far to unassigned variables. -/
   names   : Lean.PersistentHashMap UVarId Nat := {}
   nameCount : Nat := 0
@@ -53,7 +54,9 @@ def lookup? (s : Store) (u : UVarId) : Option Term := s.assign.find? u
 
 /-- Assign `u := t`, where `t` is a closed term at `u`'s level. -/
 def setAssign (s : Store) (u : UVarId) (t : Term) : Store :=
-  { s with assign := s.assign.insert u t }
+  let woken := s.cstore.wake u
+  { s with assign := s.assign.insert u t,
+           wakeQueue := woken.foldl (init := s.wakeQueue) fun q id => (id, u) :: q }
 
 def isAssigned (s : Store) (u : UVarId) : Bool := s.assign.contains u
 

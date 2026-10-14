@@ -1,0 +1,8 @@
+% Conformance: ELPI 1.18 refuses a problem outside the pattern fragment (fatal error);
+% LeanElpi suspends it. Registered in divergences.md.
+kind t type.
+type f t -> t.
+type g t -> t.
+type a t.
+
+main :- F a = g a, print "suspended".

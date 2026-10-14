@@ -96,6 +96,12 @@ Adding `leq C A` fires transitivity on `leq B C, leq C A` to give `leq B A`, and
 
 For a strict order one adds a second predicate `ltn` to the block header, `constraint leq ltn { ... }`, with `rule \ (ltn X X) <=> fail.`, `rule (ltn X Y) (leq Y X) <=> fail.` and the three mixed transitivity rules; any cycle that contains a strict edge then fails instead of collapsing.
 
+### Tier 1 as built in M2
+
+The shipped T1 solver is `lib/elpi/leq.elpi`, loaded with `accumulate leq.`.
+
+It provides reflexivity, idempotence, antisymmetry and transitivity rules over `leq`, with the user-facing clause `leq A B :- declare_constraint (leq A B) [A, B]`. The corpus program `constraints/leq_cycle.elpi` runs it against the oracle: a cycle `leq A B, leq B C, leq C A` unifies `A`, `B` and `C` with no residual constraints. Several solvers coexist because each rule only sees the predicates of its own `constraint` header.
+
 ## Tier 2: Lean builtins
 
 The second tier implements a predicate as a Lean function that the abstract machine calls directly, with an ELPI signature that the type checker enforces.
@@ -250,6 +256,12 @@ main :-
 
 The second line shows scenario "Handler simplifies a new constraint" in its propagating form; assigning `X` through the returned goal triggers `onWake` for `X`'s other constraints (scenario "Handler wakes on variable instantiation"); and the failing `lia.le Z 9` inside the if-then-else is undone together with the interval update it caused.
 
+### Tier 3 as built in M2
+
+A handler is a `ConstraintHandler` value registered with `@[elpi_constraint_handler "name"]`.
+
+`keys` names the predicates it owns, `init` is its private state (a `Dynamic` kept in `Store.cstore.handlerState`), and `onAdd c view` and `onWake x view` return a `HandlerResult`. The `view` (`HStore`) gives the constraints the handler owns, its state and a dereferencing function. Callbacks are pure, so a handler works in the runtime library, the CLI and `MetaM` alike. The tests use a `"lia"` fixture that keeps the stronger of two upper bounds and fails when a variable is instantiated beyond its bound. A CHR block over a predicate a handler owns is rejected at load time.
+
 ## Tier 4: unification hooks
 
 The fourth tier is a native fallback inside the unifier, consulted only for equations that higher-order pattern unification cannot settle on its own.
@@ -297,6 +309,12 @@ With the hook registered, `plus a (plus X b) = plus b (plus a c)` is a rigid-rig
 The same interface lets reflected Lean terms be compared up to definitional equality by asking `Meta.isDefEq` when syntax alone is stuck.
 
 A hook in `MetaM` declares the reflected head `app` of selected constants interpreted and, when stuck, reflects both sides back to `Expr` and calls `Meta.isDefEq`. Success returns `solved []` (Lean metavariable assignments made by `isDefEq` are part of the host state and backtrack with the choice point), and a postponed problem returns `suspend`. This is the optional defeq bridge mentioned in [[decisions#LF as the dependent extension]] and kept off the main path by [[alternatives#Defeq suspension as the dependent mechanism]]; the LF use of it is described in [[certified-lf]].
+
+### Tier 4 as built in M2
+
+A `UnifHook` has `interpreted` symbols and `onStuck deref a b depth`, returning `solved θ`, `suspend`, `fail` or `decline`.
+
+`Unify.loop` consults the registered hooks, in order, only when pattern unification is stuck: for a problem outside the pattern fragment, or a rigid clash on an interpreted symbol. A `solved θ` is fed back as equations `x = t`, so the occurs and scope checks of core unification apply to it; with no hook, a stuck problem is suspended.
 
 ## Registering solvers
 

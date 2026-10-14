@@ -1,0 +1,10 @@
+% Conformance: simplification and simpagation rules.
+% Exercises: elpi-constraints › CHR rules.
+constraint leq {
+  rule \ (leq X Y) (leq Y X) <=> (X = Y).
+}
+
+pred leq o:int, o:int.
+leq A B :- declare_constraint (leq A B) [A, B].
+
+main :- leq P Q, leq Q P, print P Q.

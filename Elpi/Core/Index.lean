@@ -33,7 +33,7 @@ def Symbols.name (s : Symbols) (c : ConstId) : String := s.names[c.idx]!
 
 def reservedNames : Array String :=
   #["true", "fail", "!", ",", ";", "=>", "pi", "sigma", "=", "not", ":-", "[]", "::",
-    "findall_solutions", "->", "<=", "halt", "print", "some", "none", "pr", "tt", "ff"]
+    "findall_solutions", "->", "<=", "halt", "print", "some", "none", "pr", "tt", "ff", "?-", "declare_constraint"]
 
 def cTrue : ConstId := ⟨0⟩
 def cFail : ConstId := ⟨1⟩
@@ -56,6 +56,8 @@ def cNone : ConstId := ⟨19⟩
 def cPair : ConstId := ⟨20⟩
 def cTT : ConstId := ⟨21⟩
 def cFF : ConstId := ⟨22⟩
+def cTurn : ConstId := ⟨23⟩
+def cDeclare : ConstId := ⟨24⟩
 
 def Symbols.initial : Symbols :=
   reservedNames.foldl (fun s n => (s.intern n).2) {}

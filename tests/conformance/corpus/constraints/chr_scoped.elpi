@@ -1,0 +1,13 @@
+% Conformance: a constraint under pi/=> resumes in its recorded context.
+% Exercises: elpi-constraints › Scoped constraints.
+pred mem i:int.
+pred chk i:int, i:int.
+chk C _ :- mem C, print "mem visible".
+
+pred t1.
+t1 :- pi c\ ((mem c => declare_constraint (chk c X) [X]), X = 1, print "t1 ok").
+
+pred t2.
+t2 :- pi c\ (declare_constraint (chk c X) [X], X = c, print "bad").
+
+main :- t1, (t2 ; print "t2 fails").

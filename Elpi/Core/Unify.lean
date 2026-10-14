@@ -131,6 +131,26 @@ def etaApp (t : Term) (d : Nat) : Term := Term.mkApp (t.shiftUp d 1) #[.bound d]
 
 abbrev Eqn := Term × Term × Nat
 
+/-- Unassigned variables occurring in `t` (flexible heads and arguments), without repeats. -/
+partial def collectUVars (s : Store) (t : Term) (d : Nat) (acc : Array UVarId := #[]) :
+    Array UVarId :=
+  match s.deref t d with
+  | .uvar u as =>
+    let acc := if acc.contains u then acc else acc.push u
+    as.foldl (fun a x => collectUVars s x d a) acc
+  | .app h as => as.foldl (fun a x => collectUVars s x d a) (collectUVars s h d acc)
+  | .lam b => collectUVars s b (d + 1) acc
+  | _ => acc
+
+/-- Head constant of a rigid term, if any. -/
+def headConst : Term → Option ConstId
+  | .const c => some c
+  | .app (.const c) _ => some c
+  | _ => none
+
+/-- Reserved index of the constant `=` (see `reservedNames`). -/
+def eqConst : ConstId := ⟨8⟩
+
 /-- Can this variable be assigned (match mode protects goal variables)? -/
 def assignable (protect : Nat) (u : UVarId) : Bool := u.idx ≥ protect
 
@@ -139,8 +159,31 @@ partial def loop (protect : Nat) (s : Store) : List Eqn → Option Store
   | (a, b, d) :: rest =>
     let a := s.deref a d
     let b := s.deref b d
+    -- suspend the problem as the goal `a = b` keyed on its variables (woken on assignment)
     let delayIt : Unit → Option Store := fun _ =>
-      loop protect { s with delayed := { depth := d, lhs := a, rhs := b } :: s.delayed } rest
+      let keys := collectUVars s b d (collectUVars s a d)
+      let (_, cs) := s.cstore.add
+        { id := 0, goal := .app (.const eqConst) #[a, b], keys, depth := d, locals := [],
+          pred := none }
+      loop protect { s with cstore := cs } rest
+    -- consult the hooks (only now: pattern unification could not decide the problem)
+    let tryHooks : Bool → Unit → Option Store := fun declineFails _ =>
+      let rec go (i : Nat) : Option Store :=
+        if h : i < s.hooks.size then
+          match s.hooks[i].onStuck (s.deref · d) a b d with
+          | .decline => go (i + 1)
+          | .fail => none
+          | .suspend => delayIt ()
+          | .solved θ => loop protect s (θ.map (fun (u, t) => (Term.uvar u #[], t, d)) ++ rest)
+        else if declineFails then none else delayIt ()
+      go 0
+    let interpreted : Bool :=
+      match headConst a, headConst b with
+      | some c, _ => s.interp.contains c.idx
+      | _, some c => s.interp.contains c.idx
+      | _, _ => false
+    let clash : Unit → Option Store := fun _ =>
+      if interpreted && !s.hooks.isEmpty then tryHooks true () else none
     match a, b with
     | .uvar x xs, .uvar y ys =>
       if x == y then
@@ -155,7 +198,7 @@ partial def loop (protect : Nat) (s : Store) : List Eqn → Option Store
             let (x', s1) := s.fresh ℓ (s.nameOf x)
             let val := lams n (.uvar x' (kept.map fun i => .bound (ℓ + i)))
             loop protect (s1.setAssign x val) rest
-          | _, _ => delayIt ()
+          | _, _ => tryHooks false ()
       else
         let px := patternSpine s xs d
         let py := patternSpine s ys d
@@ -171,66 +214,53 @@ partial def loop (protect : Nat) (s : Store) : List Eqn → Option Store
           match r with
           | .ok s' () => loop protect s' rest
           | .fail => none
-          | .delay => if assignable protect x || assignable protect y then delayIt () else none
+          | .delay => if assignable protect x || assignable protect y then tryHooks false () else none
         else if !assignable protect x && !assignable protect y then none
-        else delayIt ()
+        else tryHooks false ()
     | .uvar x xs, t =>
       if !assignable protect x then none else
       match solveFlex s x xs t d with
       | .ok s' () => loop protect s' rest
       | .fail => none
-      | .delay => delayIt ()
+      | .delay => tryHooks false ()
     | t, .uvar y ys =>
       if !assignable protect y then none else
       match solveFlex s y ys t d with
       | .ok s' () => loop protect s' rest
       | .fail => none
-      | .delay => delayIt ()
+      | .delay => tryHooks false ()
     | .lam x, .lam y => loop protect s ((x, y, d + 1) :: rest)
     | .lam x, t => loop protect s ((x, etaApp t d, d + 1) :: rest)
     | t, .lam y => loop protect s ((etaApp t d, y, d + 1) :: rest)
-    | .const c, .const c' => if c == c' then loop protect s rest else none
+    | .const c, .const c' => if c == c' then loop protect s rest else clash ()
     | .bound l, .bound l' => if l == l' then loop protect s rest else none
     | .lit l, .lit l' => if l == l' then loop protect s rest else none
     | .builtinData o, .builtinData o' => if o == o' then loop protect s rest else none
     | .app h as, .app h' as' =>
-      if as.size != as'.size then none else
+      if as.size != as'.size then clash () else
       let hOk :=
         match h, h' with
         | .const c, .const c' => c == c'
         | .bound l, .bound l' => l == l'
         | _, _ => false
-      if !hOk then none else
+      if !hOk then clash () else
       let pairs := (as.zip as').toList.map fun (p, q) => (p, q, d)
       loop protect s (pairs ++ rest)
-    | _, _ => none
+    | _, _ => clash ()
 
 end Unify
 
 /-- Unify `a` and `b` at depth `d`; problems outside the pattern fragment are suspended
-in `Store.delayed`. `protect` > 0 puts the unifier in match mode: variables with an index
-below `protect` (the call's own variables) may not be assigned. -/
+as constraints in `Store.cstore`, after the registered hooks (if any) were consulted.
+Variables below `Store.protect` are frozen (CHR matching and guards). -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Higher-order pattern unification]]
 def unify (s : Store) (a b : Term) (d : Nat) : Option Store :=
-  Unify.loop 0 s [(a, b, d)]
+  Unify.loop s.protect s [(a, b, d)]
 
-/-- Match mode for input arguments. -/
+/-- Match mode for input arguments: variables with an index below `protect` (the call's
+own variables) may not be assigned. -/
 -- @tg: implements:: [[openspec:elpi-typechecker#Mode declarations]]
 def unifyMatch (s : Store) (protect : Nat) (a b : Term) (d : Nat) : Option Store :=
-  Unify.loop protect s [(a, b, d)]
-
-/-- Re-examine the suspended problems against the current store. Problems that became
-rigid or patterns are unified (`none` if that fails); the rest are returned as residual. -/
-def resolveDelayed (s : Store) : Option (Store × List DelayedProblem) :=
-  let probs := s.delayed.reverse
-  let rec go (s : Store) : List DelayedProblem → Option Store
-    | [] => some s
-    | p :: ps =>
-      match unify s p.lhs p.rhs p.depth with
-      | some s' => go s' ps
-      | none => none
-  match go { s with delayed := [] } probs with
-  | some s' => some ({ s' with delayed := s'.delayed }, s'.delayed)
-  | none => none
+  Unify.loop (max protect s.protect) s [(a, b, d)]
 
 end Elpi

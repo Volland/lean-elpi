@@ -3,6 +3,7 @@ import Elpi.Core.Store
 import Elpi.Core.Unify
 import Elpi.Core.Index
 import Elpi.Core.Builtins
+import Elpi.Core.CHR
 
 /-!
 # Abstract machine
@@ -15,15 +16,6 @@ native stack. Choice points keep the persistent `Store` and a host-monad snapsho
 -- @lat: [[components#Abstract machine]]
 
 namespace Elpi
-
-/-- A clause added by `=>`: a clause term and the depth it was added at. -/
-structure LocalClause where
-  term : Term
-  depth : Nat
-  deriving Inhabited
-
-/-- Hypothetical clauses, newest group first. -/
-abbrev Locals := List LocalClause
 
 /-- A goal to solve, closed over the depth and local program it runs under. -/
 structure Frame where
@@ -73,11 +65,15 @@ structure Env (m : Type → Type) where
   db : Database
   modes : Std.HashMap Nat (Array Mode)
   builtins : Std.HashMap Nat (Builtin m)
+  /-- CHR blocks, in source order. -/
+  blocks : Array ConstraintBlock := #[]
+  /-- Native handlers by the index of each predicate they own. -/
+  handlers : Std.HashMap Nat (String × ConstraintHandler) := {}
 
-/-- A raw solution: the final store and the residual suspended problems. -/
+/-- A raw solution: the final store and the constraints still suspended in it. -/
 structure RawSolution where
   store : Store
-  residual : List DelayedProblem := []
+  constraints : List Constraint := []
   deriving Inhabited
 
 inductive Step (σ : Type) where
@@ -102,17 +98,8 @@ clause (`to` is the choice-stack height recorded at that call). -/
 def cut {σ : Type} (M : Machine σ) (to : Nat) : Machine σ :=
   { M with choices := M.choices.shrink to }
 
-/-- Rename a clause term for use at depth `d`: clause variables become fresh unification
-variables, bound levels (all internal binders of a top-level clause) move to `d`. -/
-partial def rename (vars : Array Term) (d : Nat) : Term → Term
-  | .bound l => .bound (l + d)
-  | .cvar i args =>
-    let args' := args.map (rename vars d)
-    Term.mkApp vars[i]! args'
-  | .app h as => .app (rename vars d h) (as.map (rename vars d))
-  | .lam b => .lam (rename vars d b)
-  | .uvar u as => .uvar u (as.map (rename vars d))
-  | t => t
+/-- Rename a clause term for use at depth `d` (see `Term.renameCVars`). -/
+def rename (vars : Array Term) (d : Nat) (t : Term) : Term := Term.renameCVars vars d t
 
 /-- Instantiate a static clause at depth `d`. -/
 def instClause (c : Clause) (s : Store) (d : Nat) : Store × Term × Term := Id.run do
@@ -198,6 +185,37 @@ end Machine
 
 open Machine
 
+/-- Frames for goals pushed by a handler or a rule body, in the context of `f`. -/
+def goalFrames (f : Frame) (cutTo : Nat) (goals : List Term) : List Frame :=
+  goals.map fun g => { goal := g, depth := f.depth, locals := f.locals, cutTo }
+
+/-- The view of the store a native handler is given. -/
+def hstoreOf (name : String) (h : ConstraintHandler) (s : Store) (d : Nat) : HStore :=
+  { owned := s.cstore.toList.filter (·.owner == some name)
+    state := (s.cstore.handlerState.find? name).getD h.init
+    deref := fun t => s.deref t d }
+
+/-- Apply a handler's answer: `none` means the handler failed. `newC` is the constraint
+being added (for `onAdd`); the result is the new store and the goals to push. -/
+def applyHandler (name : String) (s : Store) (f : Frame) (cutTo : Nat) (res : HandlerResult)
+    (newC : Option Constraint) : Option (Store × List Frame) :=
+  let setState (st? : Option Dynamic) (s : Store) : Store :=
+    match st? with
+    | some d => { s with cstore := { s.cstore with handlerState := s.cstore.handlerState.insert name d } }
+    | none => s
+  let addNew (s : Store) : Store :=
+    match newC with
+    | some c => { s with cstore := (s.cstore.add { c with owner := some name }).2 }
+    | none => s
+  match res with
+  | .fail => none
+  | .keep st? => some (setState st? (addNew s), [])
+  | .propagate goals st? => some (setState st? (addNew s), goalFrames f cutTo goals)
+  | .simplify keep st? =>
+    let cs := s.cstore.toList.filter (·.owner == some name) |>.foldl (fun cs c => cs.remove c.id) s.cstore
+    let cs := keep.foldl (fun cs c => (cs.add { c with owner := some name }).2) cs
+    some (setState st? { s with cstore := cs }, [])
+
 mutual
 /-- Backtrack to the most recent choice point and resume its alternative. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Depth-first search order]]
@@ -279,19 +297,123 @@ partial def tryStream {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m
         return .cont { M with choices, store := s2 }
   return (← backtrack env M)
 
+/-- Run a rule guard in a nested machine with every store variable frozen. `none` means the
+guard failed (or tried to bind a frozen variable). -/
+partial def runGuard {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
+    (env : Env m) (M : Machine σ) (c : Constraint) (mt : CHRMatch) (g : Term) :
+    m (Except (Step σ) (Option Store)) := do
+  let gt := Term.renameCVars mt.vars c.depth g
+  let st := { mt.store with protect := mt.store.nextVar }
+  let sub : Machine σ :=
+    { goals := [{ goal := gt, depth := c.depth, locals := c.locals, cutTo := 0 }],
+      store := st, fuel := M.fuel }
+  let host ← Backtrackable.save
+  let r ← runLoop env sub
+  Backtrackable.restore host
+  match r with
+  | .yield sol _ => return .ok (some { sol.store with protect := 0 })
+  | .exhausted => return .ok none
+  | .outOfFuel => return .error .outOfFuel
+  | .error e => return .error (.error e)
+
+/-- Activate a newly added constraint: try the rules of every block over its predicate, in
+source order, with the constraint at each head position; fire the first rule whose heads
+match and whose guard succeeds (kept constraints may fire further rules). Bodies are
+pushed as goals, in firing order. -/
+-- @tg: implements:: [[openspec:elpi-constraints#CHR rules]]
+partial def activate {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
+    (env : Env m) (M0 : Machine σ) (f : Frame) (c : Constraint) : m (Except (Step σ) (Machine σ)) := do
+  let some pred := c.pred | return .ok M0
+  let ts := some cTurn
+  let mut M := M0
+  let mut bodies : Array Frame := #[]
+  let mut alive := true
+  let mut fired : Array (Nat × Nat × Array Nat) := #[]
+  let mut bi := 0
+  for b in env.blocks do
+    bi := bi + 1
+    unless b.preds.contains pred do continue
+    let mut ri := 0
+    for r in b.rules do
+      ri := ri + 1
+      let heads := r.kept ++ r.removed
+      for pos in [0:heads.size] do
+        if !alive then break
+        unless headPred ts heads[pos]! == some pred do continue
+        -- keep firing this (rule, position) while new matches pass their guard
+        let mut again := true
+        while again && alive do
+          again := false
+          for mt in matchRule ts r M.store c pos do
+            if !(mt.ids.all fun id => (M.store.cstore.find? id).isSome) then continue
+            if fired.contains (bi, ri, mt.ids) then continue
+            let ok : Except (Step σ) (Option Store) ←
+              match r.guard with
+              | none => pure (.ok (some mt.store))
+              | some g => runGuard env M c mt g
+            match ok with
+            | .error e => return .error e
+            | .ok none => continue
+            | .ok (some st) =>
+              fired := fired.push (bi, ri, mt.ids)
+              let rem := mt.ids.extract r.kept.size mt.ids.size
+              let st := rem.foldl (fun (st : Store) id => { st with cstore := st.cstore.remove id }) st
+              if rem.contains c.id then alive := false
+              M := { M with store := st }
+              match r.body with
+              | some body =>
+                bodies := bodies.push
+                  { goal := Term.renameCVars mt.vars c.depth body, depth := c.depth,
+                    locals := c.locals, cutTo := M.choices.size }
+              | none => pure ()
+              again := true
+              break
+  return .ok { M with goals := bodies.toList ++ M.goals }
+
+/-- Resume the constraints woken by assignments, before the next goal runs. -/
+-- @tg: implements:: [[openspec:elpi-constraints#Delayed goals]]
+partial def drainWake {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
+    (env : Env m) (M : Machine σ) : m (SR σ) := do
+  let q := M.store.wakeQueue.reverse
+  let mut st := { M.store with wakeQueue := [] }
+  let mut frames : Array Frame := #[]
+  let mut seen : List (String × UVarId) := []
+  for (id, u) in q do
+    match st.cstore.find? id with
+    | none => pure ()
+    | some c =>
+      match c.owner with
+      | none =>
+        st := { st with cstore := st.cstore.remove id }
+        frames := frames.push
+          { goal := c.goal, depth := c.depth, locals := c.locals, cutTo := M.choices.size }
+      | some name =>
+        unless seen.contains (name, u) do
+          seen := (name, u) :: seen
+          match env.handlers.toList.find? (·.2.1 == name) with
+          | none => pure ()
+          | some (_, (_, h)) =>
+            let fr : Frame := { goal := c.goal, depth := c.depth, locals := c.locals, cutTo := M.choices.size }
+            match applyHandler name st fr M.choices.size (h.onWake u (hstoreOf name h st c.depth)) none with
+            | none => return (← backtrack env { M with store := st })
+            | some (st', fs) =>
+              st := st'
+              frames := frames ++ fs.toArray
+  return .cont { M with store := st, goals := frames.toList ++ M.goals }
+
 /-- One machine step: process the top goal. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Hereditary Harrop goals]]
 partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
     (env : Env m) (M : Machine σ) : m (SR σ) := do
   if M.resume then
     return (← backtrack env { M with resume := false })
+  if !M.store.wakeQueue.isEmpty then
+    return (← drainWake env M)
   match M.goals with
   | [] =>
-    -- solution: re-examine suspended problems
-    match resolveDelayed M.store with
-    | none => backtrack env M
-    | some (s, residual) =>
-      return .done (.yield { store := s, residual } { M with store := s, resume := true })
+    -- solution: whatever is still suspended is reported with it
+    let s := M.store
+    return .done (.yield { store := s, constraints := s.cstore.toList } { M with resume := true })
   | f :: rest =>
     if M.fuel == 0 then return .done .outOfFuel
     let M := { M with fuel := M.fuel - 1 }
@@ -334,6 +456,24 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
         match unify s args[0]! args[1]! d with
         | some s' => return .cont { M with store := s', goals := rest }
         | none => backtrack env { M with goals := rest }
+      else if c == cDeclare && args.size == 2 then
+        -- suspend a goal on the variables of the key list
+        let keys := Unify.collectUVars s args[1]! d
+        let pred := Unify.headConst (s.deref args[0]! d)
+        let cn : Constraint :=
+          { id := 0, goal := args[0]!, keys, depth := d, locals := f.locals, pred }
+        match pred.bind (fun p => env.handlers[p.idx]?) with
+        | some (name, h) =>
+          let res := h.onAdd cn (hstoreOf name h s d)
+          match applyHandler name s f M.choices.size res (some cn) with
+          | none => backtrack env { M with goals := rest }
+          | some (st, fs) => return .cont { M with store := st, goals := fs ++ rest }
+        | none =>
+          let (c', cs) := s.cstore.add cn
+          let M1 : Machine σ := { M with store := { s with cstore := cs }, goals := rest }
+          match ← activate env M1 f c' with
+          | .ok M2 => return .cont M2
+          | .error r => return .done r
       else if c == cNot && args.size == 1 then
         -- not G  ≡  (G, !, fail) ; true   with the cut local to this construct
         let host ← Backtrackable.save

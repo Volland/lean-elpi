@@ -40,11 +40,26 @@ check_oracle_version() {
   esac
 }
 
+# Corpus program name: path under the corpus directory, `/` replaced by `-`.
+prog_name() {
+  local rel="${1#"$corpus"/}"
+  rel="${rel%.elpi}"
+  echo "${rel//\//-}"
+}
+
+# The residual constraints an engine reports (between `Constraints:` and `State:` on
+# standard error), with whitespace squashed: layout differs, content must not.
+constraints_of() {
+  local c
+  c="$(awk '/^Constraints:/{on=1; next} /^State:/{on=0} on' "$1" | tr -s ' \n' ' ' | sed -e 's/^ *//' -e 's/ *$//')"
+  [ -z "$c" ] || echo "residual: $c"
+}
+
 # Run one engine on one program with a timeout; writes <name>.<tag>{,.err,.status}.
 run_engine() {
   local tag="$1" prog="$2" name status
   shift 2
-  name="$(basename "$prog" .elpi)"
+  name="$(prog_name "$prog")"
   set +e
   perl -e 'alarm shift; exec @ARGV' "$limit" "$@" -test "$prog" \
     >"$out/$name.$tag" 2>"$out/$name.$tag.err"
@@ -75,7 +90,8 @@ compare_outputs() {
       echo "exit status: oracle $(cat "$out/$name.oracle.status"), lean-elpi $(cat "$out/$name.lean.status")" >"$out/$name.diff"
       return 1 ;;
   esac
-  if diff -u <(normalise "$out/$name.oracle") <(normalise "$out/$name.lean") >"$out/$name.diff" \
+  if diff -u <(normalise "$out/$name.oracle"; constraints_of "$out/$name.oracle.err") \
+             <(normalise "$out/$name.lean"; constraints_of "$out/$name.lean.err") >"$out/$name.diff" \
      && cmp -s "$out/$name.oracle.status" "$out/$name.lean.status"; then
     return 0
   fi
@@ -88,11 +104,13 @@ compare_outputs() {
 # @tg: implements:: [[openspec:elpi-conformance#Shared conformance corpus]] {confidence: partial}
 run_corpus() {
   local failed=0 passed=0 known=0 prog name
-  for prog in "$corpus"/*.elpi; do
-    name="$(basename "$prog" .elpi)"
+  for prog in "$corpus"/*.elpi "$corpus"/*/*.elpi; do
+    [ -f "$prog" ] || continue
+    case "$prog" in */lib/*) continue ;; esac
+    name="$(prog_name "$prog")"
     run_engine oracle "$prog" "$oracle"
     if [ "$mode" = record ]; then
-      normalise "$out/$name.oracle" >"$corpus/$name.expected"
+      normalise "$out/$name.oracle" >"${prog%.elpi}.expected"
       echo "rec    $name"
       continue
     fi

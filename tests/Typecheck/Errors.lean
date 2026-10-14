@@ -19,9 +19,3 @@ open Elpi TestUtil
     let m := toString e
     check (hasSub m "bad.elpi:3:2") s!"position of the term \"x\" expected (bad.elpi:3:2): {m}"
 
--- constraint handling belongs to a later milestone and is rejected at load time
-#eval show IO Unit from do
-  let e ← loadErr "pred p.\np :- declare_constraint (p) []."
-  check (hasSub e "unsupported") s!"declare_constraint must be rejected: {e}"
-  let e ← loadErr "constraint foo { }."
-  check (hasSub e "unsupported") s!"constraint blocks must be rejected: {e}"
