@@ -13,7 +13,7 @@ lean_lib Tests where
   srcDir := "tests"
   roots := #[`TestUtil]
   globs :=
-  #[`TestUtil, `Solver.RegistrationA, `Core.+, `Constraints.+, `Typecheck.+, `Solver.+, `Runtime.+, `Libraries.+, `Cli.+, `LeanHost.Program.A, `LeanHost.+,
+  #[`TestUtil, `Solver.RegistrationA, `Core.+, `Constraints.+, `Typecheck.+, `Solver.+, `Runtime.+, `Libraries.+, `Cli.+, `LF.+, `LeanHost.Program.A, `LeanHost.+,
     `Conformance.Harness]
   needs := #[`@/«lean-elpi»]
 

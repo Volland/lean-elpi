@@ -9,7 +9,7 @@ openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api
 
 The architecture decisions of LeanElpi, one section per decision, from the design interview of 2026-10-14 and the LF design. Rejected options live in [[alternatives]].
 
-Each decision states its context, the choice and its consequences, then its `status::` (accepted, or proposed for the four LF decisions at the end) and typed edges: `motivated_by::` points at the [[constraints]], [[glossary]] concepts or earlier decisions that force it. The components each decision shapes link back from [[components]].
+Each decision states its context, the choice and its consequences, then its `status::` (accepted) and typed edges: `motivated_by::` points at the [[constraints]], [[glossary]] concepts or earlier decisions that force it. The components each decision shapes link back from [[components]].
 
 ## Native Lean engine
 
@@ -194,7 +194,7 @@ Requirements are written in OpenSpec and explained in tg.md before implementatio
 
 ## LF surface syntax
 
-LF files use `c : A.` declarations, `pi x:A\ B` for Π, both `->` and left-associative `<-` arrows, and `#` directives, all inside ELPI's lexical conventions. Proposed with the LF change.
+LF files use `c : A.` declarations, `pi x:A\ B` for Π, both `->` and left-associative `<-` arrows, and `#` directives, all inside ELPI's lexical conventions. Accepted with the LF change.
 
 **Context.** Twelf writes Π as `{x:A} B` and pragmas as `%mode`, but braces mean spilling in ELPI and `%` starts a comment. ELPI's `type c A.` form cannot name Π-bound variables.
 
@@ -202,13 +202,13 @@ LF files use `c : A.` declarations, `pi x:A\ B` for Π, both `->` and left-assoc
 
 **Consequences.** One lexer serves plain and LF files. Twelf signatures need a mechanical rewrite to load.
 
-- status:: proposed
+- status:: accepted
 - motivated_by:: [[decisions#LF as the dependent extension]]
 - motivated_by:: [[decisions#ELPI 1.18 dialect]]
 
 ## Proof holes by elaboration
 
-Proof terms are recorded by elaborating each LF predicate at load time into one with an extra proof argument, so the machine itself does not change. Proposed with the LF change.
+Proof terms are recorded by elaborating each LF predicate at load time into one with an extra proof argument, so the machine itself does not change. Accepted with the LF change.
 
 **Context.** A derivation must be built during search and discarded on backtracking. A separate trace log would need its own undo, and re-running the search after success doubles the cost.
 
@@ -216,14 +216,14 @@ Proof terms are recorded by elaborating each LF predicate at load time into one 
 
 **Consequences.** Partial derivations live in the persistent store and backtrack for free. The plain core stays as the oracle sees it.
 
-- status:: proposed
+- status:: accepted
 - motivated_by:: [[decisions#Persistent store]]
 - motivated_by:: [[decisions#Explicit abstract machine]]
 - motivated_by:: [[glossary#Proof term]]
 
 ## Well-scoped export with explicit contexts
 
-LF syntax with binders is exported as Lean inductive families indexed by scope (`Tm : Nat → Type`), and hypothetical judgments take an explicit context `Ctx n` looked up through an inductive relation. Proposed with the LF change.
+LF syntax with binders is exported as Lean inductive families indexed by scope (`Tm : Nat → Type`), and hypothetical judgments take an explicit context `Ctx n` looked up through an inductive relation. Accepted with the LF change.
 
 **Context.** Lean inductives forbid the negative occurrence in a direct HOAS encoding `lam : (Tm → Tm) → Tm`. PHOAS needs parametricity to be adequate, locally nameless adds freshness proofs to every certificate, and raw de Bruijn indices can dangle.
 
@@ -231,21 +231,21 @@ LF syntax with binders is exported as Lean inductive families indexed by scope (
 
 **Consequences.** Certificates are checked by structural conversion alone. `examples/lf/StlcExport.lean` shows the `stlc` export and two certificates passing the kernel with no axioms.
 
-- status:: proposed
+- status:: accepted
 - motivated_by:: [[decisions#LF as the dependent extension]]
 - motivated_by:: [[constraints#Kernel is the trust anchor]]
 
 ## No unproved totality theorems
 
-Totality checking emits a Lean theorem only together with a kernel-checked proof; otherwise it emits just the statement as a `Prop` definition, never a `sorry`. Proposed with the LF change.
+Totality checking emits a Lean theorem only together with a kernel-checked proof; otherwise it reports that no proof was built and adds nothing, never a `sorry`. Accepted with the LF change.
 
 **Context.** Twelf trusts its mode, coverage and termination checkers. Turning their verdict into a Lean theorem without a proof would add an unchecked assumption to the environment.
 
-**Decision.** Build the proof from the checked relation (by structural recursion over the inputs) when possible; otherwise report the meta-theorem's statement and leave it unproved.
+**Decision.** Build the proof from the checked relation (by structural induction on the designated input, one case per constructor) when possible; otherwise report that no proof was built and leave the environment unchanged.
 
-**Consequences.** Users can rely on every emitted theorem as much as on the kernel. Some total relations will produce statements only, until proof construction covers them.
+**Consequences.** Users can rely on every emitted theorem as much as on the kernel. Relations outside the supported shape (one designated argument, constructor patterns of variables, recursion on fields) pass the checker but produce no theorem.
 
-- status:: proposed
+- status:: accepted
 - motivated_by:: [[constraints#Kernel is the trust anchor]]
 - motivated_by:: [[decisions#LF as the dependent extension]]
 

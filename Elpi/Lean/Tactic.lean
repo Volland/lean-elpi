@@ -277,7 +277,7 @@ unsafe def queryGoUnsafe (syms : Symbols) (names : Array (String × UVarId)) (en
   | .ok (.yield sol M') =>
     .cons (.ok (mkSolution syms names sol))
       (Thunk.mk fun _ => queryGoUnsafe syms names envM ctxM ctxC mRef cRef M')
-  | .ok .exhausted => .nil
+  | .ok (.exhausted _ _) => .nil
   | .ok .outOfFuel => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
   | .ok (.error e) => .cons (.error e) (Thunk.mk fun _ => .nil)
 

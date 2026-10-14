@@ -9,12 +9,16 @@ import Elpi.Core.Term
 import Elpi.Core.Typecheck
 import Elpi.Core.Unify
 import Elpi.LF.Check
+import Elpi.LF.Erase
 import Elpi.LF.Export
+import Elpi.LF.Mode
 import Elpi.LF.ProofTerm
 import Elpi.LF.Strategy
+import Elpi.LF.Total
 import Elpi.Lean.Builtins
 import Elpi.Lean.Commands
 import Elpi.Lean.Derive
+import Elpi.Lean.LFCommands
 import Elpi.Lean.Libraries
 import Elpi.Lean.Marshal
 import Elpi.Lean.Quote

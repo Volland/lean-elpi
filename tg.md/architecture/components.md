@@ -6,7 +6,7 @@ openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api
 
 One section per module or tool of LeanElpi. Each states what it owns, its source file, and typed edges to the components it depends on, the decisions that shape it and the change that introduces it.
 
-Diagrams of how these fit together are in [[uml]]; the layer view is in [[architecture#Layers]]. The M1 modules are implemented (see each section); the Lean-integration, constraint and LF modules are still skeletons. Each module carries a `-- @lat:` comment pointing at its section here, because `tg` resolves links from docs into `.lean` files only in the code-to-doc direction. Modules gain `implements` edges as each requirement is built.
+Diagrams of how these fit together are in [[uml]]; the layer view is in [[architecture#Layers]]. All modules are implemented (see each section). Each module carries a `-- @lat:` comment pointing at its section here, because `tg` resolves links from docs into `.lean` files only in the code-to-doc direction. Modules gain `implements` edges as each requirement is built.
 
 ## Term store
 
@@ -231,7 +231,7 @@ Resolves `accumulate` names through the `lib/elpi/` folder of every Lake package
 
 ## LF checker
 
-Checks `#lf` files: LF kinds, dependent types and objects, clause typing, and mode, coverage and termination in later stages. Source: `Elpi/LF/Check.lean`.
+Reads and checks `#lf` files: the surface syntax and its directives, LF kinds, dependent types and objects with implicit-argument reconstruction, and the family roles. Source: `Elpi/LF/Check.lean`.
 
 - module:: Elpi.LF.Check
 - milestone:: LF
@@ -242,7 +242,9 @@ Checks `#lf` files: LF kinds, dependent types and objects, clause typing, and mo
 
 ## LF proof terms
 
-Records an LF derivation alongside resolution, one constructor per clause, kept in the persistent store so backtracking discards it. Source: `Elpi/LF/ProofTerm.lean`.
+Records an LF derivation during resolution: each `lf.<family>` predicate takes the proof term as its first argument, so backtracking discards partial derivations. Source: `Elpi/LF/ProofTerm.lean`.
+
+The module also holds the bridge hook and the query driver; erasure for plain programs is `Elpi/LF/Erase.lean`.
 
 - module:: Elpi.LF.ProofTerm
 - milestone:: LF
@@ -253,7 +255,7 @@ Records an LF derivation alongside resolution, one constructor per clause, kept 
 
 ## LF export
 
-Compiles LF signatures to Lean inductive families and proof terms to Lean terms, then has the kernel check them as certificates. Source: `Elpi/LF/Export.lean`.
+Compiles LF signatures in the exportable fragment to Lean inductive families, and proof terms to fully explicit constructor applications that the kernel checks as certificates. Source: `Elpi/LF/Export.lean`.
 
 `examples/lf/StlcExport.lean` is the hand-written target for the `stlc` signature; it passes the kernel with no axioms, which validates the encoding chosen in [[decisions#Well-scoped export with explicit contexts]].
 
@@ -266,12 +268,41 @@ Compiles LF signatures to Lean inductive families and proof terms to Lean terms,
 
 ## LF strategies
 
-The pluggable search-strategy interface (depth-first, bounded, iterative deepening), enabled only for LF proof search. Source: `Elpi/LF/Strategy.lean`.
+Search strategies for LF proof search (depth-first, bounded, iterative deepening), driven by a derivation depth per LF goal and a cutoff flag in the machine. Source: `Elpi/LF/Strategy.lean`.
+
+Iterative deepening restarts with shared fuel and reports each answer once, by proof-height window.
 
 - module:: Elpi.LF.Strategy
 - milestone:: LF
 - depends_on:: [[components#Abstract machine]]
 - motivated_by:: [[decisions#Explicit abstract machine]]
+- introduced_by:: [[changes#add-elpi-lf]]
+
+## LF modes and totality
+
+Static analyses of LF signatures: `#mode` groundness checking, world regularity, input and output coverage, structural termination, and the construction of a kernel-checked totality theorem. Source: `Elpi/LF/Mode.lean`, `Elpi/LF/Total.lean`.
+
+The checks are diagnostics outside the trust base. A totality theorem is added only when its proof is built and accepted by the kernel; see [[decisions#No unproved totality theorems]].
+
+- module:: Elpi.LF.Mode
+- module:: Elpi.LF.Total
+- milestone:: LF
+- depends_on:: [[components#LF checker]]
+- depends_on:: [[components#LF export]]
+- motivated_by:: [[decisions#No unproved totality theorems]]
+- introduced_by:: [[changes#add-elpi-lf]]
+
+## LF Lean commands
+
+The LF commands `lf_signature`, `#lf_query`, `lf_export` and `lf_certify`, over an environment extension that stores signatures as source. Source: `Elpi/Lean/LFCommands.lean`.
+
+The module also compiles bridged Lean functions to closures for the bridge hook.
+
+- module:: Elpi.Lean.LFCommands
+- milestone:: LF
+- depends_on:: [[components#LF export]]
+- depends_on:: [[components#Commands]]
+- motivated_by:: [[constraints#Kernel is the trust anchor]]
 - introduced_by:: [[changes#add-elpi-lf]]
 
 ## CLI

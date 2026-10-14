@@ -42,5 +42,5 @@ The dependent extension: LF signatures opt-in per file, proof-term recording, ex
 
 Depends on all three earlier changes. Capability: `elpi-lf`. Its design document is the most detailed of the four. Files: `openspec/changes/add-elpi-lf/`.
 
-- status:: proposed
+- status:: implemented
 - milestone:: LF

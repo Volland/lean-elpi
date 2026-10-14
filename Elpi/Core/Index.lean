@@ -98,6 +98,13 @@ def Symbols.initial : Symbols := Id.run do
     s := { byId := s.byId.insert i reservedNames[i]!, ids := s.ids.insert reservedNames[i]! i }
   return s
 
+/-- The id of a constant by name: the reserved id for control and reflection constants, the
+hash id for everything else. -/
+def constIdOf (n : String) : ConstId :=
+  match Symbols.initial.find? n with
+  | some c => c
+  | none => ⟨symbolId n⟩
+
 /-- Names interned beyond the reserved ones. -/
 def Symbols.userNames (s : Symbols) : List String :=
   s.ids.toList.filterMap fun (n, i) => if i < reservedNames.size then none else some n

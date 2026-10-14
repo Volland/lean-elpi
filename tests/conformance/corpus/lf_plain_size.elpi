@@ -1,0 +1,13 @@
+% A plain file (no `#lf` header): the LF layer must not change its meaning.
+kind tm type.
+type base tm.
+type app tm -> tm -> tm.
+type lam (tm -> tm) -> tm.
+
+pred size i:tm, o:int.
+size base 1.
+size (app A B) N :- size A NA, size B NB, N is NA + NB + 1.
+size (lam F) N :- pi x\ size x 1 => size (F x) NF, N is NF + 1.
+
+main :- size (app base (app base base)) N, print N,
+        size (lam x\ app x x) M, print M.

@@ -5,7 +5,7 @@ openspec: [elpi-lf]
 
 How LeanElpi does dependently typed proof search in LF and hands every derivation it finds to the Lean kernel as a checked certificate, so the search engine never has to be trusted.
 
-This paper is for readers who know some Prolog or Lean but have not met logical frameworks. It explains why we chose LF as the dependent extension ([[decisions#LF as the dependent extension]]), what the extension adds to the engine, how a derivation becomes a Lean proof, and where the trust boundary lies. The work is the `add-elpi-lf` milestone ([[changes#add-elpi-lf]]), currently proposed; everything here describes the agreed design, specified in the `elpi-lf` capability.
+This paper is for readers who know some Prolog or Lean but have not met logical frameworks. It explains why we chose LF as the dependent extension ([[decisions#LF as the dependent extension]]), what the extension adds to the engine, how a derivation becomes a Lean proof, and where the trust boundary lies. The work is the `add-elpi-lf` milestone ([[changes#add-elpi-lf]]), implemented; everything here describes the design as built, specified in the `elpi-lf` capability.
 
 ## Judgments as types
 
@@ -243,8 +243,9 @@ LeanElpi's LF extension borrows its logic from Twelf, its search language from Î
 
 ## Limitations and open questions
 
-The extension is a proposed milestone; several design questions are deliberately left open and will be settled in its OpenSpec change.
+The extension is implemented, with the scope limits listed first; the remaining design questions are deliberately left open.
 
+- **Scope of the first implementation.** The exporter handles one assumption family per signature, binders only over the family being defined, and judgments whose indices are plain syntax; it does not generate `Tm.ren`/`Tm.subst`, cache exports by signature hash or accept `#export` overrides. Totality theorems are built for one designated argument with constructor patterns of variables. Bridged functions are `Nat`-valued with at most three arguments, and erasure for plain programs does not cover numerals.
 - **Adequacy proofs.** Adequacy of the de Bruijn translation is argued for the scheme and tested by round trips; producing per-signature Lean proofs of adequacy is open.
 - **Size of certificates.** Derivations with large implicit arguments can be big; whether to export implicit arguments or let Lean's elaborator reconstruct them (making the elaborator, not just the kernel, part of the check path) is undecided. The default is full terms, checked by the kernel alone.
 - **Dependent signatures beyond STLC.** Families whose indices are themselves dependent (for example, intrinsically typed terms) export to more complex Lean families; the exporter's coverage of such signatures will grow with the test corpus.

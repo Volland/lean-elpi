@@ -1,0 +1,14 @@
+#lf
+% The simply typed λ-calculus.
+tp   : type.
+arr  : tp -> tp -> tp.
+base : tp.
+tm   : type.
+lam  : tp -> (tm -> tm) -> tm.
+app  : tm -> tm -> tm.
+of   : tm -> tp -> type.
+of_lam : of (lam T1 E) (arr T1 T2)
+          <- (pi x:tm\ of x T1 -> of (E x) T2).
+of_app : of (app E1 E2) T2
+          <- of E1 (arr T1 T2)
+          <- of E2 T1.

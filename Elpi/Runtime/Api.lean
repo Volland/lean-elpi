@@ -377,7 +377,7 @@ where
     match Id.run (runLoop env M) with
     | .yield sol M' =>
       .cons (.ok (mkSolution syms names sol)) (Thunk.mk fun _ => go env syms names M')
-    | .exhausted => .nil
+    | .exhausted _ _ => .nil
     | .outOfFuel => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
     | .error e => .cons (.error e) (Thunk.mk fun _ => .nil)
 
@@ -403,7 +403,7 @@ def solveIO (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) :
         | .yield sol M' =>
           ref.set (some M')
           return some (mkSolution prep.syms prep.names sol)
-        | .exhausted => ref.set none; return none
+        | .exhausted _ _ => ref.set none; return none
         | .outOfFuel => ref.set none; throw (IO.userError (toString ElpiError.outOfFuel))
         | .error e => ref.set none; throw (IO.userError (toString e)) }
 
@@ -656,7 +656,7 @@ def runPrepared {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [
     while out.size < limit do
       match ← runLoop env cur with
       | .yield sol M' => out := out.push (mkSolution prep.syms prep.names sol); cur := M'
-      | .exhausted => break
+      | .exhausted _ _ => break
       | .outOfFuel => return .error .outOfFuel
       | .error e => return .error e
     return .ok out.toList

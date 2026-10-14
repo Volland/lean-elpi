@@ -1,4 +1,5 @@
 import Std.Data.HashMap
+import Std.Data.HashSet
 import Elpi.Core.Store
 import Elpi.Core.Unify
 import Elpi.Core.Index
@@ -24,6 +25,8 @@ structure Frame where
   locals : Locals
   /-- Choice-stack height to cut back to (cut barrier). -/
   cutTo : Nat
+  /-- Derivation depth, consulted only for LF goals (search strategies). -/
+  ldepth : Nat := 0
   deriving Inhabited
 
 /-- A clause candidate for a call. -/
@@ -57,6 +60,8 @@ structure Machine (σ : Type) where
   fuel : Nat := 100000000
   /-- The previous solution was yielded: the next step backtracks. -/
   resume : Bool := false
+  /-- Some LF goal was pruned by the depth bound (not undone by backtracking). -/
+  cutoff : Bool := false
   deriving Inhabited
 
 /-- Static environment of a run. -/
@@ -69,6 +74,9 @@ structure Env (m : Type → Type) where
   blocks : Array ConstraintBlock := #[]
   /-- Native handlers by the index of each predicate they own. -/
   handlers : Std.HashMap Nat (String × ConstraintHandler) := {}
+  /-- LF predicates (by constant index) and the derivation depth bound for them. -/
+  lfPreds : Std.HashSet Nat := {}
+  bound : Option Nat := none
 
 /-- A raw solution: the final store and the constraints still suspended in it. -/
 structure RawSolution where
@@ -78,7 +86,8 @@ structure RawSolution where
 
 inductive Step (σ : Type) where
   | yield (s : RawSolution) (resume : Machine σ)
-  | exhausted
+  /-- The search space is exhausted; `cutoff` tells whether a depth bound pruned anything. -/
+  | exhausted (cutoff : Bool) (fuel : Nat)
   | outOfFuel
   | error (e : ElpiError)
 
@@ -87,8 +96,8 @@ inductive SR (σ : Type) where
   | cont (M : Machine σ)
   | done (r : Step σ)
 
-instance {σ : Type} : Inhabited (SR σ) := ⟨.done .exhausted⟩
-instance {σ : Type} : Inhabited (Step σ) := ⟨.exhausted⟩
+instance {σ : Type} : Inhabited (SR σ) := ⟨.done (.exhausted false 0)⟩
+instance {σ : Type} : Inhabited (Step σ) := ⟨.exhausted false 0⟩
 
 namespace Machine
 
@@ -221,7 +230,7 @@ mutual
 -- @tg: implements:: [[openspec:elpi-core-engine#Depth-first search order]]
 partial def backtrack {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
     (env : Env m) (M : Machine σ) : m (SR σ) := do
-  let some cp := M.choices.back? | return .done .exhausted
+  let some cp := M.choices.back? | return .done (.exhausted M.cutoff M.fuel)
   let choices := M.choices.pop
   Backtrackable.restore cp.host
   let M' : Machine σ := { M with choices, store := cp.store, goals := cp.goals, resume := false }
@@ -260,8 +269,8 @@ partial def tryClauses {m : Type → Type} {σ : Type} [Monad m] [Backtrackable 
       let goals :=
         match b with
         | .const c => if c == cTrue then M.goals
-                      else { goal := b, depth := d, locals := call.locals, cutTo := barrier } :: M.goals
-        | _ => { goal := b, depth := d, locals := call.locals, cutTo := barrier } :: M.goals
+                      else { goal := b, depth := d, locals := call.locals, cutTo := barrier, ldepth := call.ldepth } :: M.goals
+        | _ => { goal := b, depth := d, locals := call.locals, cutTo := barrier, ldepth := call.ldepth } :: M.goals
       return .cont { M with goals, choices, store := s2, fuel := M.fuel }
   backtrack env M
 
@@ -312,7 +321,7 @@ partial def runGuard {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m 
   Backtrackable.restore host
   match r with
   | .yield sol _ => return .ok (some { sol.store with protect := 0 })
-  | .exhausted => return .ok none
+  | .exhausted _ _ => return .ok none
   | .outOfFuel => return .error .outOfFuel
   | .error e => return .error (.error e)
 
@@ -499,7 +508,7 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
             results := results.push (sol.store, args[0]!)
             fuelLeft := resume.fuel
             cur := resume
-          | .exhausted => break
+          | .exhausted _ _ => break
           | .outOfFuel => err := some .outOfFuel; break
           | .error e => err := some (.error e); break
         Backtrackable.restore host
@@ -538,12 +547,18 @@ partial def callPred {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m 
         for i in db.candidates key do
           cands := cands.push (.static db.clauses[i]!)
       | none => pure ()
-      if cands.isEmpty then
+      -- LF goals go one derivation level deeper; the strategy's bound prunes them
+      let isLF := env.lfPreds.contains c.idx
+      let nd := if isLF then f.ldepth + 1 else f.ldepth
+      let pruned := match env.bound with | some b => isLF && nd > b | none => false
+      if pruned then
+        backtrack env { M with cutoff := true }
+      else if cands.isEmpty then
         -- unknown predicate without clauses simply fails
         backtrack env M
       else
         let call : Frame := { f with goal := (if args.isEmpty then .const c else .app (.const c) args),
-                                     cutTo := M.choices.size }
+                                     cutTo := M.choices.size, ldepth := nd }
         tryClauses env M call cands 0
 
 /-- Run steps until the machine yields, is exhausted, runs out of fuel or fails. -/

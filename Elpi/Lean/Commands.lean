@@ -1,4 +1,5 @@
 import Lean
+import Elpi.LF.Erase
 import Elpi.Lean.Libraries
 import Elpi.Lean.Builtins
 import Elpi.Lean.Quote
@@ -308,7 +309,7 @@ def processSource (target : Name) (o : Origin) (ref : Syntax) (leanFile : String
     match ← Libraries.resolve cfg name from_ with
     | .ok r => return some r
     | .error _ => return none
-  let ds ← match ← loadUnits (m := IO) find o.label o.text with
+  let ds ← match ← loadUnits (m := IO) find o.label o.text (pre := Elpi.LF.preprocessUnit) with
     | .ok ds => pure ds
     | .error e => reportElpiError o ref e.toString
   let ds ← match ← liftTermElabM (Quote.elabDecls ds) with

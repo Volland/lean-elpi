@@ -13,6 +13,6 @@ open Elpi TestUtil
       expectEq M.choices.size 0 "no choice point remains after the answer"
       -- a further solution fails immediately, without spending any fuel
       match Id.run (runLoop (p.env Id) M) with
-      | .exhausted => pure ()
+      | .exhausted _ _ => pure ()
       | _ => fail "expected exhaustion"
     | _ => fail "expected a first solution"

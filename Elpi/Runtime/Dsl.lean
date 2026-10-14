@@ -35,7 +35,7 @@ partial def solveQueryGo {α : Type} [FromBindings α] (env : Env Id) (syms : Sy
   | .yield sol M' =>
     .cons (FromBindings.decode (mkSolution syms names sol).bindings)
       (Thunk.mk fun _ => solveQueryGo env syms names M')
-  | .exhausted => .nil
+  | .exhausted _ _ => .nil
   | .outOfFuel => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
   | .error e => .cons (.error e) (Thunk.mk fun _ => .nil)
 

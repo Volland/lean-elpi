@@ -1,0 +1,12 @@
+% erased from the LF signature stlc
+kind tp type.
+kind tm type.
+type arr tp -> tp -> tp.
+type base tp.
+type lam tp -> (tm -> tm) -> tm.
+type app tm -> tm -> tm.
+type of tm -> tp -> prop.
+of (lam T1 (x0\ E x0)) (arr T1 T2) :- (pi x0\ (of x0 T1) => of (E x0) T2).
+of (app E1 E2) T2 :- (of E1 (arr T1 T2)), (of E2 T1).
+
+main :- of (lam base x\ lam base y\ x) T, print T.

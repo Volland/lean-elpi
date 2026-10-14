@@ -1,4 +1,5 @@
 import Lean
+import Elpi.LF.Erase
 import Elpi.Lean.Libraries
 import Elpi.Lean.Builtins
 import Elpi.Solver.Registry
@@ -21,6 +22,10 @@ structure Opts where
   includes : List String := []
   leanEnv : List String := []
   fuel : Nat := defaultFuel
+  /-- `--lf-erase`: print the erasure of the `#lf` files and stop. -/
+  lfErase : Bool := false
+  /-- `--lf-proof QUERY`: answer an LF query on the `#lf` file, with proof terms. -/
+  lfProof : Option String := none
   rest : List String := []
 
 /-- Parse `FILE… [-test] [-exec P] [-I DIR] [--lean-env M1,M2] [--fuel N] [-- ARGS]`. -/
@@ -37,6 +42,9 @@ partial def parseArgs (args : List String) (o : Opts := {}) : Except String Opts
   | "--lean-env" :: ms :: r =>
     parseArgs r { o with leanEnv := (ms.splitOn ",").filter (· != "") }
   | "--lean-env" :: [] => .error "--lean-env expects a module list"
+  | "--lf-erase" :: r => parseArgs r { o with lfErase := true }
+  | "--lf-proof" :: q :: r => parseArgs r { o with lfProof := some q }
+  | "--lf-proof" :: [] => .error "--lf-proof expects a query"
   | "--fuel" :: n :: r =>
     match n.toNat? with
     | some k => parseArgs r { o with fuel := k }
@@ -147,24 +155,49 @@ def main (args : List String) : IO UInt32 := do
       try pure (some (← unsafe loadLeanEnv o.leanEnv))
       catch e => IO.eprintln s!"lean-elpi: cannot load the Lean environment: {e}"; return 1
     let sigs := match env? with | some env => Registry.signatures env | none => []
+    if o.lfErase || o.lfProof.isSome then
+      let mut code : UInt32 := 0
+      for f in o.files do
+        let src ← IO.FS.readFile f
+        let name := (f.splitOn "/").getLast!.replace ".elpi" ""
+        match Elpi.LF.loadSource name f src with
+        | .error e => IO.eprintln (toString e); code := 1
+        | .ok sig =>
+          if o.lfErase then IO.print (Elpi.LF.erase sig)
+          if let some q := o.lfProof then
+            match Elpi.LF.elaborate sig with
+            | .error m => IO.eprintln m; code := 1
+            | .ok lp =>
+              let mut any := false
+              for r in (Elpi.LF.runQuery sig lp q o.fuel).take 100 do
+                match r with
+                | .error e => IO.eprintln s!"error: {e}"; code := 1
+                | .ok a =>
+                  any := true
+                  let b := a.showBindings
+                  if !b.isEmpty then IO.println b
+                  IO.println s!"proof: {a.showProof}"
+              unless any do IO.println "Failure"
+      (← IO.getStdout).flush
+      return code
     let mut prog : Option CompiledProgram := none
     for f in o.files do
-      match prog with
-      | none =>
-        match ← Program.loadFile f cfg sigs with
-        | .ok p => prog := some p
-        | .error e => IO.eprintln (envHint (toString e)); return 1
-      | some p =>
-        let find (name from_ : String) : IO (Option (String × String)) := do
-          match ← Libraries.resolve cfg name from_ with
-          | .ok r => return some r
-          | .error _ => return none
-        match ← loadUnits find f (← IO.FS.readFile f) with
-        | .error e => IO.eprintln s!"{e.toString}"; return 1
-        | .ok ds =>
-          match p.addDecls ds with
-          | .ok p' => prog := some p'
+      let p ← match prog with
+        | some p => pure p
+        | none =>
+          match Program.loadWith sigs "" with
+          | .ok p => pure p
           | .error e => IO.eprintln (envHint (toString e)); return 1
+      let find (name from_ : String) : IO (Option (String × String)) := do
+        match ← Libraries.resolve cfg name from_ with
+        | .ok r => return some r
+        | .error _ => return none
+      match ← loadUnits find f (← IO.FS.readFile f) (pre := Elpi.LF.preprocessUnit) with
+      | .error e => IO.eprintln s!"{e.toString}"; return 1
+      | .ok ds =>
+        match p.addDecls ds with
+        | .ok p' => prog := some p'
+        | .error e => IO.eprintln (envHint (toString e)); return 1
     let p ← match prog with
       | some p => pure p
       | none =>

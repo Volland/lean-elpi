@@ -842,9 +842,14 @@ source), loading each unit at most once, and flatten namespaces. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Accumulate and namespaces]]
 partial def loadUnits {m : Type → Type} [Monad m]
     (find : String → String → m (Option (String × String)))
-    (file src : String) : m (Except ParseError (List Decl)) := do
+    (file src : String)
+    (pre : String → String → Except String String := fun _ s => .ok s) :
+    m (Except ParseError (List Decl)) := do
   let rec go (file src : String) (seen : Std.HashSet String) :
       m (Except ParseError (List Decl × Std.HashSet String)) := do
+    match pre file src with
+    | .error msg => return .error { pos := { file }, msg := msg }
+    | .ok src =>
     match Parser.parseProgram file src with
     | .error e => return .error e
     | .ok ds =>
