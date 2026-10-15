@@ -94,3 +94,13 @@ Rejected for now because the installed oracle is 1.18; a dialect without an orac
 - status:: rejected
 - -contradicts:: [[decisions#ELPI 1.18 dialect]]
 - motivated_by:: [[constraints#Oracle is ELPI 1.18]]
+
+## Everything as Expr
+
+Cross the boundary only with reflected `term`s, so a user's `Shape` is `app (const "Shape.circle" []) [lit (nat 1)]` and no ELPI-side data types exist.
+
+Rejected because the ELPI type checker then cannot tell a shape from a proof, every program pattern-matches on constant names, and results need a hand-written decoder. Plain derived types keep ELPI's checking and give a typed decoder for free.
+
+- status:: rejected
+- -contradicts:: [[decisions#Two-way type bridge]]
+- motivated_by:: [[decisions#Plain types with reflected Lean terms]]

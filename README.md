@@ -6,7 +6,54 @@ dialect of λProlog. It embeds in Lean as a metaprogramming tool (commands, tact
 standalone `lean-elpi` binary, and adds an opt-in LF layer with kernel-checked proof
 terms.
 
-**Status:** version 0.1: the engine, constraints, Lean integration and the LF layer are implemented. Documentation site and book: https://volland.github.io/lean-elpi/ (sources in `site/`, built into `docs/` with `python3 site/build.py`).
+**Status:** version 0.2: the engine, constraints, Lean integration, the LF layer and the Lean/ELPI type bridge are implemented. Documentation site and book: https://volland.github.io/lean-elpi/ (sources in `site/`, built into `docs/` with `python3 site/build.py`).
+
+## Use it in your project
+
+Add LeanElpi as a Lake dependency (Lean 4.35.0, no Mathlib needed):
+
+```lean
+-- lakefile.lean
+require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.2.0"
+```
+
+or in `lakefile.toml`:
+
+```toml
+[[require]]
+name = "lean-elpi"
+git = "https://github.com/Volland/lean-elpi"
+rev = "v0.2.0"
+```
+
+Then `import Elpi`:
+
+```lean
+import Elpi
+open Elpi.Cmd
+
+-- a Lean type, shared with ELPI
+inductive Tree (α : Type) where
+  | leaf
+  | node (l : Tree α) (a : α) (r : Tree α)
+  deriving Elpi
+
+-- a Lean function, callable from ELPI
+def twice (n : Nat) : Nat := 2 * n
+elpi_extern twice
+
+elpi_program demo
+#elpi demo lp%{ twice 21 X }%     -- X = 42
+```
+
+## What it does
+
+- **ELPI engine in Lean**: typed clauses, `pi`/`=>`, higher-order pattern unification, modes, constraints and CHR, a command-line tool, and a lazy library API.
+- **Lean integration**: `{{ … }}` quotations, tactics and commands written in λProlog, `lean.*` builtins over `MetaM`, a typed rule DSL.
+- **Type bridge** (new in 0.2): `deriving Elpi` for parametric and recursive types, `elpi_data` (ELPI types to Lean inductives), `elpi_extern` (typed Lean functions as ELPI predicates), `lean.env.indt` / `lean.add_inductive` (read and create inductive types from ELPI).
+- **LF layer**: dependently typed signatures, recorded proof terms, export to Lean inductives, kernel-checked certificates.
+
+See [CHANGELOG.md](CHANGELOG.md) for releases and [CONTRIBUTING.md](CONTRIBUTING.md) to help.
 
 ## Where to read
 

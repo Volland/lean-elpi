@@ -212,7 +212,7 @@ type declarations, the signatures of registered builtins and the accumulated uni
 parsed: units hold ready declarations. -/
 def assemble (env : Environment) (target : Name) (extra : List Decl := []) :
     Except ElpiError CompiledProgram := do
-  let sigs := Registry.signatures env ++ derivedSignatures env
+  let sigs := derivedSignatures env ++ Registry.signatures env
   let mut pre : List Decl := []
   for sg in sigs do
     match Parser.parseProgram "<signature>" sg with

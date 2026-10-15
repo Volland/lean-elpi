@@ -1,6 +1,6 @@
 ---
 title: Higher-order logic and neuro-symbolic systems
-order: 10
+order: 11
 summary: Why binders, hypotheses and checkable derivations matter when learned and symbolic parts meet.
 ---
 # Higher-order logic and neuro-symbolic systems

@@ -152,6 +152,14 @@ Typed conversion of ordinary Lean values (numbers, strings, lists, user inductiv
 
 - defines:: [[components#Marshalling]]
 
+## Plain data
+
+An inductive type or structure with `Type` parameters, no indices and fields that are plain data themselves: the fragment of Lean types that ELPI's simple types can express.
+
+`deriving Elpi` and `elpi_data` work exactly on this fragment: [[decisions#Two-way type bridge]].
+
+- defines:: [[components#Type interoperability]]
+
 ## LF
 
 The Edinburgh Logical Framework (λΠ): dependent function types and type families with only β and η, no computation in types.

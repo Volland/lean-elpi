@@ -5,7 +5,7 @@ date: 2026-10-14
 ---
 # Changes
 
-The four OpenSpec changes that build LeanElpi, one per milestone. Each lives in `openspec/changes/<name>/` with a proposal, design, delta specs and tasks.
+The OpenSpec changes that build LeanElpi, one per milestone. Each lives in `openspec/changes/<name>/` with a proposal, design, delta specs and tasks.
 
 Components point here with `introduced_by::` edges, so `tg cypher` can list what each milestone delivers. Run `tg trace` to see requirement coverage per capability.
 
@@ -44,3 +44,12 @@ Depends on all three earlier changes. Capability: `elpi-lf`. Its design document
 
 - status:: implemented
 - milestone:: LF
+
+## add-lean-interop
+
+The type bridge: parametric and recursive `deriving Elpi`, `elpi_data`, `elpi_extern`, `#elpi_signature`, and the builtins `lean.env.indt` and `lean.add_inductive`.
+
+Depends on [[changes#add-lean-integration]]. Capability: `lean-interop`; it also modifies `lean-reflection`. Explained in [[papers/interop]]. Files: `openspec/changes/add-lean-interop/`.
+
+- status:: implemented
+- milestone:: Interop

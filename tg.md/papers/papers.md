@@ -8,3 +8,4 @@ Paper-style documents that explain how LeanElpi works and why, written for Lean 
 - [[solvers]] — Writing Your Own Solver, the four solver tiers with worked examples
 - [[lean-together]] — Using Lean and ELPI Together, commands, tactics, the runtime library and binaries
 - [[certified-lf]] — Certified Proof Search with LF, the dependent extension and kernel-checked certificates
+- [[interop]] — Lean and ELPI types, declaring data, functions and inductive types on one side and using them on the other

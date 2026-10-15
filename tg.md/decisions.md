@@ -3,7 +3,7 @@ type: Decision
 status: accepted  # per section: see each status:: line
 date: 2026-10-14
 owner: Volodymyr Pavlyshyn
-openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop]
 ---
 # Decisions
 
@@ -300,3 +300,18 @@ A tactic's returned goals are created in the local context of the goal plus the 
 
 - status:: accepted
 - motivated_by:: [[constraints#Kernel is the trust anchor]]
+
+## Two-way type bridge
+
+Plain data types are declared once, on either side, and the other side is generated; Lean functions and inductive types cross as typed predicates and as declarations-as-data.
+
+**Context.** [[decisions#Plain types with reflected Lean terms]] fixed that ELPI stays simply typed, but left users to write each data type twice and to hand-write untyped builtin glue. Coq-Elpi avoids the first problem by sharing the host's term language and has typed `coq.*` predicates; see [[papers/interop]].
+
+**Decision.** `deriving Elpi` accepts type parameters and recursion, `elpi_data` defines Lean types from ELPI declarations by running the same deriving, `elpi_extern` computes an ELPI signature from a Lean function type, and `lean.env.indt` / `lean.add_inductive` make inductive declarations ELPI data. Only the plain fragment (no indices, `Type` parameters) crosses; everything else is rejected with a pointer to `Expr` reflection or LF.
+
+**Consequences.** The ELPI text of a type has one source, so round trips are tested properties. Type variables are named by position and Lean parameter names are lost. Type classes are not bridged yet.
+
+- status:: accepted
+- motivated_by:: [[decisions#Plain types with reflected Lean terms]]
+- motivated_by:: [[constraints#CIC unification is undecidable]]
+- introduced_by:: [[changes#add-lean-interop]]

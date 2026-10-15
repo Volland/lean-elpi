@@ -4,7 +4,14 @@ open System Lake DSL
 
 package «lean-elpi» where
   testDriver := "Tests"
-  version := v!"0.1.0"
+  version := v!"0.2.0"
+  description := "A native Lean 4 implementation of the ELPI dialect of λProlog: embedded in Lean as commands, tactics and MetaM builtins, with typed Lean/ELPI data interoperability and an LF layer with kernel-checked proofs."
+  keywords := #["lambda-prolog", "elpi", "logic-programming", "metaprogramming", "tactics"]
+  homepage := "https://volland.github.io/lean-elpi/"
+  license := "Apache-2.0"
+  licenseFiles := #["LICENSE"]
+  readmeFile := "README.md"
+  versionTags := .startsWith "v"
   leanOptions := #[⟨`autoImplicit, false⟩]
 
 @[default_target] lean_lib Elpi where precompileModules := true
@@ -13,7 +20,7 @@ lean_lib Tests where
   srcDir := "tests"
   roots := #[`TestUtil]
   globs :=
-  #[`TestUtil, `Solver.RegistrationA, `Core.+, `Constraints.+, `Typecheck.+, `Solver.+, `Runtime.+, `Libraries.+, `Cli.+, `LF.+, `LeanHost.Program.A, `LeanHost.+,
+  #[`TestUtil, `Solver.RegistrationA, `Core.+, `Constraints.+, `Typecheck.+, `Solver.+, `Runtime.+, `Libraries.+, `Cli.+, `LF.+, `LeanHost.Program.A, `LeanHost.+, `Interop.+,
     `Conformance.Harness]
   needs := #[`@/«lean-elpi»]
 

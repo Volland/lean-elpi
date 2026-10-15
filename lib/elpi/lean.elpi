@@ -56,6 +56,15 @@ kind lean.declaration type.
 type lean.def name -> term -> term -> lean.declaration.
 type lean.inst name -> term -> term -> lean.declaration.
 
+% An inductive type read from, or to be added to, the Lean environment: its name, number of
+% parameters, number of indices, its type (Pi-telescope over parameters and indices) and its
+% constructors. Constructor types mention the inductive as `const Name []` applied to the
+% parameters.
+kind lean.ctor type.
+type lean.ctor name -> term -> lean.ctor.
+kind lean.indt type.
+type lean.indt name -> int -> int -> term -> list lean.ctor -> lean.indt.
+
 % ---- builtins (implemented in Lean, see Elpi/Lean/Builtins.lean) ----------------
 pred lean.env.find i:name, o:info.
 pred lean.infer i:term, o:term.
@@ -65,6 +74,8 @@ pred lean.elab i:string, i:term, o:term.
 pred lean.mk_mvar i:term, o:term.
 pred lean.pp i:term, o:string.
 pred lean.add_decl i:lean.declaration.
+pred lean.env.indt i:name, o:lean.indt.
+pred lean.add_inductive i:lean.indt.
 pred lean.db.accumulate i:string, i:string.
 pred lean.last-error o:string.
 pred lean.name->string i:name, o:string.

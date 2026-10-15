@@ -51,6 +51,30 @@ def cCtorInfo : ConstId := ⟨symbolId "ctorinfo"⟩
 def cConstInfo : ConstId := ⟨symbolId "constinfo"⟩
 def cLeanDef : ConstId := ⟨symbolId "lean.def"⟩
 def cLeanInst : ConstId := ⟨symbolId "lean.inst"⟩
+def cLeanIndt : ConstId := ⟨symbolId "lean.indt"⟩
+def cLeanCtor : ConstId := ⟨symbolId "lean.ctor"⟩
+
+/-- The elements of an ELPI list term. -/
+private partial def termList : Term → Option (List Term)
+  | .const c => if c == cNil then some [] else none
+  | .app (.const c) #[x, rest] => if c == cCons then (termList rest).map (x :: ·) else none
+  | _ => none
+
+/-- The auxiliary constructions the `inductive` command adds after the declaration. -/
+private def mkAuxConstructions (n : Name) : MetaM Unit := do
+  let env ← getEnv
+  let hasEq := env.contains ``Eq
+  let hasHEq := env.contains ``HEq
+  let hasUnit := env.contains ``PUnit
+  let hasProd := env.contains ``Prod
+  let hasNat := env.contains ``Nat
+  if hasUnit then mkCasesOn n
+  mkRecOn n
+  if hasNat then mkCtorIdx n
+  if hasNat then mkCtorElim n
+  if hasUnit && hasEq && hasHEq then mkNoConfusion n
+  if hasUnit && hasProd then mkBelow n
+  if hasUnit && hasProd then mkBRecOn n
 
 private def one (c : BCtx) (args : Array Term) : BResult :=
   .alts c.store (.cons args (Thunk.mk fun _ => .nil))
@@ -159,6 +183,55 @@ def leanBuiltins (cfg : Config) : List (Builtin MetaM) :=
           return one c args
         | _, _, _ => return .error "lean.add_decl: bad declaration"
       | _ => return .error "lean.add_decl: bad declaration",
+    -- @tg: implements:: [[openspec:lean-interop#Inductive types from ELPI]]
+    mk "lean.env.indt" [.i, .o] fun c args =>
+      match Reflect.opaqueOf "name" (c.store.deref args[0]! c.depth) with
+      | .error m => return .error s!"lean.env.indt: {m}"
+      | .ok d => guarded cfg c do
+        let n := Reflect.nameDec d
+        let some (.inductInfo iv) := (← getEnv).find? n | return .fail
+        let ctors ← iv.ctors.mapM fun cn => do
+          let some (.ctorInfo cv) := (← getEnv).find? cn | throwError "missing constructor {cn}"
+          match reflectExpr c cv.type with
+          | .ok t => pure (Term.app (.const cLeanCtor) #[Reflect.nameTerm cn, t])
+          | .error m => throwError m
+        match reflectExpr c iv.type with
+        | .ok t =>
+          let info := Term.app (.const cLeanIndt)
+            #[Reflect.nameTerm n, .lit (.int iv.numParams), .lit (.int iv.numIndices), t,
+              Reflect.listTerm ctors]
+          return one c (args.set! 1 info)
+        | .error m => throwError m,
+    mk "lean.add_inductive" [.i] fun c args => do
+      unless cfg.phase == .command do
+        return .error s!"lean.add_inductive is only available in commands (current phase: {cfg.phase.toString})"
+      match c.store.zonk args[0]! c.depth with
+      | .app (.const k) #[nm, .lit (.int np), .lit (.int _), ty, cs] =>
+        if k != cLeanIndt then return .error "lean.add_inductive: bad declaration"
+        let some ctorTs := termList cs | return .error "lean.add_inductive: the constructors must be a list"
+        match Reflect.opaqueOf "name" nm, argExpr c ty with
+        | .ok nd, .ok tye => guarded cfg c do
+          let n := Reflect.nameDec nd
+          let mut ctors : List Constructor := []
+          let mut lps := collectLevelParams {} (← instantiateMVars tye)
+          for ct in ctorTs do
+            match ct with
+            | .app (.const kk) #[cn, cty] =>
+              if kk != cLeanCtor then throwError "lean.add_inductive: bad constructor"
+              match Reflect.opaqueOf "name" cn, argExpr c cty with
+              | .ok cnd, .ok ctye =>
+                let ctye ← instantiateMVars ctye
+                lps := collectLevelParams lps ctye
+                ctors := ctors ++ [{ name := Reflect.nameDec cnd, type := ctye }]
+              | _, _ => throwError "lean.add_inductive: bad constructor"
+            | _ => throwError "lean.add_inductive: bad constructor"
+          addDecl <| .inductDecl lps.params.toList np.toNat
+            [{ name := n, type := (← instantiateMVars tye), ctors }] false
+          compileDecls #[n]
+          mkAuxConstructions n
+          return one c args
+        | _, _ => return .error "lean.add_inductive: bad declaration"
+      | _ => return .error "lean.add_inductive: bad declaration",
     mk "lean.db.accumulate" [.i, .i] fun c args => do
       unless cfg.phase == .command do
         return .error s!"lean.db.accumulate is only available in commands (current phase: {cfg.phase.toString})"

@@ -1,6 +1,6 @@
 ---
 title: Certified proof search with LF
-order: 9
+order: 10
 summary: The LF layer: signatures, proof terms, export to Lean, and kernel-checked certificates.
 ---
 # Certified proof search with LF

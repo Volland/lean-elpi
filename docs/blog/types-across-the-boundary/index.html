@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Types across the boundary · LeanElpi</title>
+<meta name="description" content="LeanElpi can now share data types, functions and inductive declarations between Lean and λProlog in both directions.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/">Book</a><a href="/lean-elpi/blog/" aria-current=page>Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+
+<article><p class=meta><time>2026-10-15</time> · Volodymyr Pavlyshyn</p><h1 id="types-across-the-boundary">Types across the boundary</h1>
+<p>LeanElpi 0.1 let ELPI programs read and build Lean terms. This week it learned to share <em>data</em> in both directions.</p>
+<h2 id="what-is-new">What is new</h2>
+<ul><li><code>deriving Elpi</code> now works for parametric and recursive types. <code>Tree α</code> becomes <code>kind tree type -&gt; type</code>, and <code>#elpi_signature Tree</code> shows the result. (It did not work for recursive types before. The documented example had a bug, now fixed and tested.)</li><li><code>elpi_data</code> defines Lean inductive types from ELPI <code>kind</code> and <code>type</code> declarations, so a type designed in the logic program needs no second definition.</li><li><code>elpi_extern</code> exposes an ordinary Lean function as an ELPI predicate, in three forms: total, <code>partial</code> (an <code>Option</code>) and <code>many</code> (a <code>List</code>).</li><li><code>lean.env.indt</code> and <code>lean.add_inductive</code> let ELPI read an inductive type completely and add a new one, with <code>casesOn</code>, <code>noConfusion</code> and friends, like Coq-Elpi's <code>coq.env.indt</code> and <code>coq.env.add-indt</code>.</li></ul>
+<p>The book has a new chapter, <a href="/lean-elpi/book/interop/">Sharing types between Lean and λProlog</a>, with every example from the test suite.</p>
+<h2 id="why">Why</h2>
+<p>Coq-Elpi works because declarations are data and host functions are typed predicates. We compared what it does with what LeanElpi did, and found three gaps: type parameters, a second copy of every type on the other side, and untyped glue code for host functions. All three are closed by one rule: <strong>declare a type once, on either side, and generate the other.</strong> The ELPI text of a type then has a single source, so round trips are tested properties.</p>
+<p>Only plain data crosses. Indexed families, proofs and higher-order constructors are rejected with a message that points at <code>term</code> reflection or the LF layer. We prefer an error to a silent approximation.</p>
+<h2 id="next">Next</h2>
+<p>Type classes. Lean instance resolution and ELPI clause resolution are both tabled proof search, and a bridge in either direction is the obvious next step.</p></article>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>

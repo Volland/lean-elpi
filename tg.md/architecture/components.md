@@ -1,6 +1,6 @@
 ---
 type: Component
-openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop]
 ---
 # Components
 
@@ -183,9 +183,21 @@ Lossless translation between `Lean.Expr` and the HOAS ELPI `term`, with universe
 - motivated_by:: [[glossary#Marshalling]]
 - introduced_by:: [[changes#add-lean-integration]]
 
+## Type interoperability
+
+The two-way type bridge: `elpi_data` (ELPI declarations to Lean inductives), `elpi_extern` (typed Lean functions as ELPI predicates) and `#elpi_signature`. Source: `Elpi/Lean/Interop.lean`; parametric `deriving Elpi` is in `Elpi/Lean/Marshal.lean`.
+
+- module:: Elpi.Lean.Interop
+- milestone:: Interop
+- depends_on:: [[components#Marshalling]]
+- depends_on:: [[components#Solver registry]]
+- depends_on:: [[components#Commands]]
+- motivated_by:: [[decisions#Two-way type bridge]]
+- introduced_by:: [[changes#add-lean-interop]]
+
 ## Lean builtins
 
-The `lean.*` builtins (`lean.infer`, `lean.defeq`, `lean.whnf`, `lean.elab`, `lean.env.find`, `lean.add_decl`, …) and the phase-restriction flag. Source: `Elpi/Lean/Builtins.lean`.
+The `lean.*` builtins (`lean.infer`, `lean.defeq`, `lean.whnf`, `lean.elab`, `lean.env.find`, `lean.env.indt`, `lean.add_decl`, `lean.add_inductive`, …) and the phase-restriction flag. Source: `Elpi/Lean/Builtins.lean`.
 
 - module:: Elpi.Lean.Builtins
 - milestone:: M3

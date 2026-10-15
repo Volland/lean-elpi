@@ -18,6 +18,7 @@ import Elpi.LF.Total
 import Elpi.Lean.Builtins
 import Elpi.Lean.Commands
 import Elpi.Lean.Derive
+import Elpi.Lean.Interop
 import Elpi.Lean.LFCommands
 import Elpi.Lean.Libraries
 import Elpi.Lean.Marshal

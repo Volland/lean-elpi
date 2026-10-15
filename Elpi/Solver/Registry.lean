@@ -53,7 +53,7 @@ def effectOfType (ty : Expr) : Option Effect :=
   | none => none
 
 /-- Parse and typecheck a builtin signature string; the result is the `pred` declaration. -/
-def checkSig (name sigSrc : String) : Except String Decl := do
+def checkSig (name sigSrc : String) (extra : List String := []) : Except String Decl := do
   let ds ← match Parser.parseProgram "<elpi_builtin>" sigSrc with
     | .ok ds => pure ds
     | .error e => throw s!"invalid builtin signature: {e.toString}"
@@ -63,7 +63,17 @@ def checkSig (name sigSrc : String) : Except String Decl := do
     let base ← match baseProgram with
       | .ok b => pure b
       | .error e => throw (toString e)
-    match Typecheck.checkSignature base.sig d with
+    -- declarations the signature may refer to (derived kinds and types), in order
+    let mut sig := base.sig
+    for src in extra do
+      let eds ← match Parser.parseProgram "<elpi_builtin>" src with
+        | .ok eds => pure eds
+        | .error e => throw s!"invalid declaration: {e.toString}"
+      for ed in eds do
+        match Typecheck.checkSignature sig ed with
+        | .ok s => sig := s
+        | .error e => throw s!"invalid declaration: {e.toString}"
+    match Typecheck.checkSignature sig d with
     | .ok _ => pure d
     | .error e => throw s!"invalid builtin signature: {e.toString}"
   | _ => throw "a builtin signature must be a single 'pred' declaration"
@@ -141,8 +151,11 @@ opaque evalImpl {α : Type} (env : Environment) (opts : Options) (n : Name) : Ex
 
 /-- Modes of the output positions in the signature of `e`. -/
 def modesOf (e : Entry) : Except String (Array Mode) := do
-  match ← checkSig e.name e.sigSrc with
-  | .pred _ args _ => pure (args.map (·.1)).toArray
+  let ds ← match Parser.parseProgram "<elpi_builtin>" e.sigSrc with
+    | .ok ds => pure ds
+    | .error err => throw s!"invalid builtin signature: {err.toString}"
+  match ds with
+  | [.pred _ args _] => pure (args.map (·.1)).toArray
   | _ => throw "bad signature"
 
 /-- The pure implementations of the registered builtins, as `Builtin Id` values. -/

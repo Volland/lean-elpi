@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sharing types between Lean and λProlog · LeanElpi</title>
+<meta name="description" content="Declare a data type, a function or an inductive type on one side and use it on the other, and what Coq-Elpi taught us about doing so.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/interop/" aria-current=page>Sharing types between Lean and λProlog</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li></ol></aside>
+<article><h1 id="sharing-types-between-lean-and-prolog">Sharing types between Lean and λProlog</h1>
+<p>A λProlog program that cannot talk about your data is a toy. This chapter shows how types, functions and whole inductive declarations move between Lean and ELPI without hand-written glue.</p>
+<p>It assumes the previous chapter, <a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a>. Every example here is a test in the repository, so the output shown is real.</p>
+<h2 id="the-problem">The problem</h2>
+<p>Lean and ELPI describe data differently. Lean has dependent types, ELPI has simple types with type variables. Lean has <code>inductive Tree (α : Type)</code>, ELPI has <code>kind tree type -&gt; type</code>. In the first release you could pass a <code>Nat</code> or a <code>List Nat</code> across the boundary, derive the ELPI declarations of a <em>simple</em> Lean type, and call <code>MetaM</code> from ELPI. Three things were missing:</p>
+<ul><li>a type with a parameter, or a recursive type, could not be derived at all;</li><li>a type you designed in ELPI had to be written a second time in Lean;</li><li>calling an ordinary Lean function from ELPI meant writing untyped glue by hand.</li></ul>
+<p>Coq-Elpi, the λProlog layer of the Coq proof assistant, solved similar problems with one idea: <em>declarations are data, and host functions are typed predicates</em>. LeanElpi now has the same, adapted to Lean.</p>
+<h2 id="what-crosses">What crosses</h2>
+<p>A type crosses the boundary when ELPI's simple types can express it. We call that <strong>plain data</strong>: an inductive type or structure whose parameters are <code>Type</code>, with no indices, and whose fields are plain data too.</p>
+<table><thead><tr><th>Lean</th><th>ELPI</th></tr></thead><tbody><tr><td><code>Nat</code>, <code>Int</code>, <code>String</code>, <code>Bool</code>, <code>Float</code></td><td><code>int</code>, <code>int</code>, <code>string</code>, <code>bool</code>, <code>float</code></td></tr><tr><td><code>List α</code>, <code>Option α</code>, <code>α × β</code></td><td><code>list A</code>, <code>option A</code>, <code>pair A B</code></td></tr><tr><td><code>Lean.Expr</code>, <code>Lean.Name</code></td><td><code>term</code>, <code>name</code></td></tr><tr><td><code>inductive Tree (α : Type)</code></td><td><code>kind tree type -&gt; type.</code></td></tr></tbody></table>
+<p>Indexed families such as <code>Vec α n</code> and proofs do not cross as data. Reflect them as <code>term</code>, or use the LF layer.</p>
+<h2 id="from-lean-to-elpi-deriving">From Lean to ELPI: deriving</h2>
+<p>Add <code>deriving Elpi</code> to a type and you get the ELPI declarations and the conversion functions. Parameters and recursion work:</p>
+<pre><code class="language-lean">inductive Tree (α : Type) where
+  | leaf
+  | node (l : Tree α) (a : α) (r : Tree α)
+  deriving Elpi
+
+#elpi_signature Tree</code></pre>
+<p>The infoview shows what ELPI now knows about the type:</p>
+<pre><code>kind tree type -&gt; type.
+type leaf tree A.
+type node tree A -&gt; A -&gt; tree A -&gt; tree A.</code></pre>
+<p>The Lean parameter <code>α</code> became the ELPI type variable <code>A</code>. Variables are named by position, <code>A</code> then <code>B</code>, because ELPI type variables must be capitalised. The instances <code>[ToElpi α] → ToElpi (Tree α)</code> and <code>[FromElpi α] → FromElpi (Tree α)</code> are generated too, so a <code>Tree Nat</code> goes to ELPI and a <code>Tree Nat</code> comes back:</p>
+<pre><code class="language-lean">#eval (fromElpi (toElpi (Tree.node .leaf 3 .leaf)) : Except DecodeError (Tree Nat)) |&gt;.isOk</code></pre>
+<p>Decoding is checked. A <code>Tree String</code> decoded at <code>Tree Nat</code> is a <code>DecodeError</code>, not a crash.</p>
+<h2 id="from-elpi-to-lean-elpi-data">From ELPI to Lean: <code>elpi_data</code></h2>
+<p>Sometimes the type belongs to the logic program. Write it there, and Lean gets the inductive for free:</p>
+<pre><code class="language-lean">elpi_data lp%{
+  kind shape type.
+  type circle int -&gt; shape.
+  type square int -&gt; shape.
+  type beside shape -&gt; shape -&gt; shape.
+}%</code></pre>
+<p>This defines <code>inductive Shape</code> with three constructors and <code>deriving Elpi</code>, so the ELPI declarations are the ones you wrote. Now a program can compute with shapes and Lean can read the answers at the right type:</p>
+<pre><code class="language-lean">elpi_program areas
+elpi_accumulate areas lp%{
+  accumulate lean.
+  pred area i:shape, o:int.
+  area (circle R) A :- A is 3 * R * R.
+  area (square S) A :- A is S * S.
+  area (beside X Y) A :- area X A1, area Y A2, A is A1 + A2.
+
+  pred mirror i:shape, o:shape.
+  mirror (beside X Y) (beside Y1 X1) :- !, mirror X X1, mirror Y Y1.
+  mirror S S.
+}%
+
+#eval show MetaM _ from do
+  let m ← Elpi.query areas &quot;mirror (beside (circle 1) (square 2)) M&quot;
+  return m.head?.bind fun | .ok sol =&gt; (sol.get? &quot;M&quot; : Option Shape) | _ =&gt; none</code></pre>
+<p>The result is <code>some (Shape.beside (Shape.square 2) (Shape.circle 1))</code>, an ordinary Lean value. A kind with the single constructor <code>point.mk</code> becomes a Lean <code>structure</code>.</p>
+<p>Some ELPI types have no Lean counterpart, and <code>elpi_data</code> says so instead of guessing. A constructor such as <code>type lam (tm -&gt; tm) -&gt; tm</code> is rejected: a Lean inductive cannot contain that function type. Use <code>term</code> for syntax with binders. Nothing is defined if there is any error.</p>
+<h2 id="lean-functions-as-predicates">Lean functions as predicates</h2>
+<p><code>elpi_extern</code> turns a typed Lean function into an ELPI predicate. The ELPI signature is worked out from the Lean type:</p>
+<pre><code class="language-lean">def twice (n : Nat) : Nat := 2 * n
+elpi_extern twice                          -- pred twice i:int, o:int.
+
+def half (n : Nat) : Option Nat :=
+  if n % 2 == 0 then some (n / 2) else none
+elpi_extern partial half                   -- fails when the result is none
+
+def divisors (n : Nat) : List Nat :=
+  (List.range (n + 1)).filter fun d =&gt; d != 0 &amp;&amp; n % d == 0
+elpi_extern many divisors as &quot;divisor&quot;     -- one solution per element</code></pre>
+<p>The three forms match the three kinds of predicate. A total function has one solution, a partial function has at most one, and a multi-valued function has many, in order:</p>
+<pre><code class="language-lean">#elpi myprog lp%{ twice 21 X }%          -- X = 42
+#elpi myprog lp%{ half 7 X }%            -- no solution
+#elpi myprog lp%{ divisor 12 D }%        -- D = 1, then 2, 3, 4, 6, 12</code></pre>
+<p>Arguments can be any plain type, including your own derived types. <code>def trSize (t : Tr Nat) : Nat</code> becomes a predicate whose first argument has the ELPI type <code>tr int</code>. Because the signature is declared, ELPI's type checker rejects <code>twice &quot;x&quot; X</code> when the program is loaded.</p>
+<h2 id="reading-and-writing-inductive-types-from-elpi">Reading and writing inductive types from ELPI</h2>
+<p>Everything so far moves <em>values</em>. Sometimes a program should create a <em>type</em>. Two builtins do that:</p>
+<ul><li><code>lean.env.indt Name Indt</code> reads a complete inductive type: its parameters, indices, type and constructors.</li><li><code>lean.add_inductive Indt</code> adds one to the environment, with <code>casesOn</code>, <code>recOn</code>, <code>noConfusion</code> and the other constructions you would get from <code>inductive</code>.</li></ul>
+<p>Here is a command that copies an inductive type under a new name. It is about as long as the sentence describing it:</p>
+<pre><code class="language-lean">elpi_program cloner
+elpi_accumulate cloner lp%{
+  accumulate lean.
+  pred main i:list argument.
+  pred rename-ctor i:string, i:string, i:lean.ctor, o:lean.ctor.
+  rename-ctor From To (lean.ctor CN T) (lean.ctor CN1 T1) :-
+    lean.name-&gt;string CN CS,
+    L is size From, N is size CS, M is N - L, Rest is substring CS L M,
+    CS1 is To ^ Rest, lean.string-&gt;name CS1 CN1, copy T T1.
+  main [str From, str To] :-
+    lean.string-&gt;name From FN, lean.string-&gt;name To TN,
+    lean.env.indt FN (lean.indt _ NP NI Ty Cs),
+    ( pi L\ copy (const FN L) (const TN L) ) =&gt; (
+      copy Ty Ty1, std.map Cs (rename-ctor From To) Cs1 ),
+    lean.add_inductive (lean.indt TN NP NI Ty1 Cs1).
+}%
+elpi_command clone := cloner
+elpi_export clone
+
+clone &quot;Option&quot; &quot;MyOption&quot;
+
+def MyOption.get (d : Nat) : MyOption Nat → Nat
+  | .none =&gt; d
+  | .some x =&gt; x
+
+example : (MyOption.some 3).get 0 = 3 := rfl</code></pre>
+<p><code>MyOption</code> supports pattern matching and <code>rfl</code> proofs because <code>lean.add_inductive</code> builds the same auxiliary definitions as the <code>inductive</code> command. Like <code>lean.add_decl</code>, it works only under commands: a tactic that tries it fails with an error and the environment stays unchanged. And the kernel still checks everything, so a wrongly built inductive is rejected whatever your ELPI program believed.</p>
+<p>This is the Lean version of Coq-Elpi's <code>coq.env.indt</code> and <code>coq.env.add-indt</code>, the pair that the whole <code>derive</code> family of Coq tools is written with. With them, deriving a map function or a decidable equality for a type can be written as a short λProlog program.</p>
+<h2 id="what-we-learned-from-coq-elpi">What we learned from Coq-Elpi</h2>
+<p>Coq-Elpi has had ten years of use, and four of its lessons were worth copying:</p>
+<ul><li><strong>Declarations are data.</strong> A program that can read and build inductive declarations can derive things.</li><li><strong>Host functions are typed predicates.</strong> Declared types and modes let the ELPI checker find mistakes before anything runs.</li><li><strong>Quotations in both directions.</strong> <code>{{ … }}</code> and <code>lp:</code> already existed in LeanElpi.</li><li><strong>One source of truth.</strong> Coq-Elpi keeps its own data types in Elpi and converts by hand. We generate each side from one declaration, so the two cannot drift apart.</li></ul>
+<p>One lesson did not transfer. Coq-Elpi shares <em>the whole term language</em> of Coq between host and logic program, because for Coq users the terms are the data. Lean programs are full of data that is not an <code>Expr</code>, so LeanElpi needs a second path next to reflection, which is plain derived data.</p>
+<h2 id="limits">Limits</h2>
+<ul><li>Indexed families, proofs and dependent fields do not cross as plain data.</li><li><code>elpi_data</code> refuses higher-order constructors. Use <code>term</code>, or the LF layer.</li><li>Type classes are not bridged yet. Lean instance resolution and ELPI clause resolution are both tabled proof search, so this is the natural next step.</li><li>Variables are named <code>A</code>, <code>B</code>, … by position; the Lean names of parameters are not kept in the ELPI text.</li></ul>
+<h2 id="next">Next</h2>
+<p>The <a href="/lean-elpi/book/lf/">LF chapter</a> covers the dependent side that this chapter deliberately leaves out, and the <a href="https://github.com/Volland/lean-elpi/blob/main/tg.md/papers/interop.md">design paper</a> has the full reasoning.</p></article><nav class="pager"><a href="/lean-elpi/book/inside-lean/">← Using it inside Lean</a><a href="/lean-elpi/book/lf/">Certified proof search with LF →</a></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>
