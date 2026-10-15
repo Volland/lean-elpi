@@ -743,6 +743,7 @@ private partial def substMacros (ms : Macros) (toks : Array Token) : Except Pars
   return out
 
 /-- Expand the macros of a token stream, dropping their definitions. -/
+-- @tg: implements:: [[openspec:elpi-core-engine#ELPI 1.18 surface syntax]]
 def expandMacros (toks : Array Token) : Except ParseError (Array Token) := do
   let mut ms : Macros := {}
   let mut out : Array Token := #[]
