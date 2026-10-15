@@ -62,3 +62,12 @@ Depends on [[changes#add-elpi-core]]. Capability: `language-bindings`. Files: `o
 
 - status:: implemented
 - milestone:: Bindings
+
+## optimize-clause-selection
+
+Compiled clauses, prepared candidate arrays, hypotheses indexed by predicate and key, fused relocation in dereferencing, and fewer per-step allocations in head matching and unification.
+
+Follows the archived `optimize-engine-store`. Capability: `elpi-core-engine` (first-argument and hypothesis indexing, compiled clauses and term sharing). The profile analysis and the comparison with ELPI 1.18's runtime are in its design document. Motivated by [[decisions#Allocate less than OCaml]]. Files: `openspec/changes/archive/2026-10-15-optimize-clause-selection/`.
+
+- status:: implemented
+- milestone:: Performance

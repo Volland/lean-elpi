@@ -68,13 +68,33 @@ def mkApp (h : Term) (args : Array Term) : Term :=
   | .cvar i as => .cvar i (as ++ args)
   | _ => .app h args
 
+@[inline] private unsafe def sameRefImpl {α : Type} (a b : α) : Bool := ptrEq a b
+
+/-- `a` and `b` are the same object. Only used to keep a node instead of rebuilding it, so the
+reference implementation answers `false` (always rebuild) and compiled code compares pointers. -/
+@[implemented_by sameRefImpl] def sameRef {α : Type} (_a _b : α) : Bool := false
+
+/-- Rebuild an application only if its head or arguments changed. -/
+@[inline] def updApp (t h : Term) (as : Array Term) (h' : Term) (as' : Array Term) : Term :=
+  if sameRef h h' && sameRef as as' then t else .app h' as'
+
+@[inline] def updLam (t b b' : Term) : Term := if sameRef b b' then t else .lam b'
+
+@[inline] def updUVar (t : Term) (u : UVarId) (as as' : Array Term) : Term :=
+  if sameRef as as' then t else .uvar u as'
+
+@[inline] def updCVar (t : Term) (i : Nat) (as as' : Array Term) : Term :=
+  if sameRef as as' then t else .cvar i as'
+
 /-- Relocate: increase every level `≥ d` by `k` (the "move" of binders when a term built
-at depth `d` is used `k` levels deeper). -/
+at depth `d` is used `k` levels deeper). Subterms that do not change are returned as they are,
+so relocating a term whose binders do not move allocates nothing. -/
 partial def shiftUp (t : Term) (d k : Nat) : Term :=
   if k == 0 then t else go t
 where
-  go : Term → Term
-    | .bound l => if l ≥ d then .bound (l + k) else .bound l
+  go (t : Term) : Term :=
+    match t with
+    | .bound l => if l ≥ d then .bound (l + k) else t
     | .app h as => .app (go h) (as.map go)
     | .lam b => .lam (go b)
     | .uvar u as => .uvar u (as.map go)
@@ -95,7 +115,7 @@ partial def subst (t : Term) (d : Nat) (a : Term) (k : Nat := 0) : Term :=
     let as' := as.map (subst · d a k)
     match h with
     | .bound l =>
-      if l == d then applyAt (a.shiftUp d k) as' (d + k)
+      if l == d then applyAtFrom a d as' (d + k)
       else .app (subst h d a k) as'
     | _ => .app h as'
   | .lam b => .lam (subst b d a (k + 1))
@@ -104,26 +124,50 @@ partial def subst (t : Term) (d : Nat) (a : Term) (k : Nat := 0) : Term :=
   | t => t
 
 /-- Substitute `args` for the levels `d, d+1, …, d+n-1` at once in `t` (which lives at depth
-`d+n+k`), lowering levels `≥ d+n` by `n`: `subst` for several arguments in one traversal. Each
-`args[i]` lives at depth `d`. The result lives at depth `d+k`. -/
-partial def substN (t : Term) (d : Nat) (args : Array Term) (k : Nat) : Term :=
+`d+n+k`), and move the levels `≥ d+n` (binders inside `t`) to start at `T` instead: `subst` for
+several arguments in one traversal, fused with the relocation `shiftUp d (T - d)` when `T > d`.
+Each `args[i]` lives at depth `T`. The result lives at depth `T+k`. -/
+partial def substNTo (t : Term) (d T : Nat) (args : Array Term) (k : Nat) : Term :=
   let n := args.size
   match t with
   | .bound l =>
     if l < d then t
-    else if l < d + n then args[l - d]!.shiftUp d k
-    else .bound (l - n)
+    else if l < d + n then args[l - d]!.shiftUp T k
+    else .bound (l - (d + n) + T)
   | .app h as =>
-    let as' := as.map (substN · d args k)
+    let as' := as.map (substNTo · d T args k)
     match h with
     | .bound l =>
-      if d ≤ l && l < d + n then applyAt (args[l - d]!.shiftUp d k) as' (d + k)
-      else .app (substN h d args k) as'
+      if d ≤ l && l < d + n then applyAtFrom args[l - d]! T as' (T + k)
+      else .app (substNTo h d T args k) as'
     | _ => .app h as'
-  | .lam b => .lam (substN b d args (k + 1))
-  | .uvar u as => .uvar u (as.map (substN · d args k))
-  | .cvar i as => .cvar i (as.map (substN · d args k))
+  | .lam b => .lam (substNTo b d T args (k + 1))
+  | .uvar u as => .uvar u (as.map (substNTo · d T args k))
+  | .cvar i as => .cvar i (as.map (substNTo · d T args k))
   | t => t
+
+/-- Substitute `args` for the levels `d, d+1, …, d+n-1` at once in `t` (which lives at depth
+`d+n+k`), lowering levels `≥ d+n` by `n`. Each `args[i]` lives at depth `d`. The result lives
+at depth `d+k`. -/
+partial def substN (t : Term) (d : Nat) (args : Array Term) (k : Nat) : Term :=
+  substNTo t d d args k
+
+/-- Apply `f`, which lives at depth `src`, to `args`, which live at depth `D ≥ src`: the same as
+`applyAt (f.shiftUp src (D - src)) args D`, but the λs that meet an argument are relocated while
+they are substituted, in one traversal instead of two. -/
+partial def applyAtFrom (f : Term) (src : Nat) (args : Array Term) (D : Nat) : Term :=
+  if D ≤ src then applyAt f args D else
+  if args.isEmpty then f.shiftUp src (D - src) else
+  match f with
+  | .lam _ =>
+    let rec peel (t : Term) (m : Nat) : Term × Nat :=
+      match t with
+      | .lam b => if m < args.size then peel b (m + 1) else (t, m)
+      | _ => (t, m)
+    let (body, m) := peel f 0
+    let r := substNTo body src D (if m == args.size then args else args.extract 0 m) 0
+    if m == args.size then r else applyAt r (args.extract m args.size) D
+  | _ => mkApp (f.shiftUp src (D - src)) args
 
 /-- Apply `f` (living at depth `D`) to `args`, β-reducing when `f` is a `lam`. All the
 arguments that meet a λ are substituted in one pass. -/
@@ -148,21 +192,18 @@ A clause variable bound to a term that lives at depth `d` (not to a unification 
 is relocated to the depth of its occurrence, `d` plus the binders crossed. -/
 partial def renameCVars (vars : Array Term) (d : Nat) (t : Term) : Term := go 0 t
 where
-  go (k : Nat) : Term → Term
-    | .bound l => .bound (l + d)
+  go (k : Nat) (t : Term) : Term :=
+    match t with
+    | .bound l => if d == 0 then t else .bound (l + d)
     | .cvar i args =>
-      let args' := args.map (go k)
-      match vars[i]! with
-      | .uvar u us => if args'.isEmpty then .uvar u us else mkApp (.uvar u us) args'
-      | v =>
-        let v := v.shiftUp d k
-        if args'.isEmpty then v else
-        match v with
-        | .lam _ => applyAt v args' (d + k)
-        | _ => mkApp v args'
-    | .app h as => .app (go k h) (as.map (go k))
-    | .lam b => .lam (go (k + 1) b)
-    | .uvar u as => .uvar u (as.map (go k))
+      let args' := args.mapMono (go k)
+      let v := vars[i]!
+      match v with
+      | .uvar .. => if args'.isEmpty then v else mkApp v args'
+      | _ => applyAtFrom v d args' (d + k)
+    | .app h as => updApp t h as (go k h) (as.mapMono (go k))
+    | .lam b => updLam t b (go (k + 1) b)
+    | .uvar u as => updUVar t u as (as.mapMono (go k))
     | t => t
 
 /-- Instantiate level `d` of a body living at depth `d+1` with `a` (living at depth `d`). -/

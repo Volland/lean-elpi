@@ -43,7 +43,7 @@ def headPred (ts : Option ConstId) : Term → Option ConstId
 
 /-- Reify a recorded local program as a list of clause terms. -/
 def reifyLocals (ls : Locals) : Term :=
-  ls.foldr (fun lc acc => .app (.const ⟨12⟩) #[lc.term, acc]) (.const ⟨11⟩)
+  ls.list.foldr (fun lc acc => .app (.const ⟨12⟩) #[lc.term, acc]) (.const ⟨11⟩)
 
 /-- One complete match of a rule: constraint ids per head (kept heads first) and the store
 extended with the bindings of the rule's variables. -/

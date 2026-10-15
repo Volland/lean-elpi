@@ -24,8 +24,64 @@ structure LocalClause where
   key : Key := .flex
   deriving Inhabited
 
-/-- Hypothetical clauses, newest group first. -/
-abbrev Locals := List LocalClause
+/-- Hypothetical clauses: all of them, newest group first, and the same clauses indexed by head
+predicate and first-argument key, so that a call looks only at the hypotheses that can apply. -/
+structure Locals where
+  list : List LocalClause := []
+  /-- Hypotheses by head predicate (constant index), in the order of `list`, each with its
+  position counted from the oldest (newer is larger). -/
+  byPred : Lean.PersistentHashMap Nat (List (Nat × LocalClause)) := {}
+  /-- Hypotheses by predicate and rigid first-argument key. -/
+  byKey : Lean.PersistentHashMap (Nat × Key) (List (Nat × LocalClause)) := {}
+  /-- Hypotheses by predicate whose first argument is a variable or a λ (they match any key). -/
+  flex : Lean.PersistentHashMap Nat (List (Nat × LocalClause)) := {}
+  /-- How many hypotheses had no visible head when added; while there are any, a call scans
+  `list` so that their order relative to the others is kept. -/
+  unknown : Nat := 0
+  count : Nat := 0
+  deriving Inhabited
+
+namespace Locals
+
+private def cons {κ : Type} [BEq κ] [Hashable κ] (m : Lean.PersistentHashMap κ (List (Nat × LocalClause)))
+    (k : κ) (e : Nat × LocalClause) : Lean.PersistentHashMap κ (List (Nat × LocalClause)) :=
+  m.insert k (e :: m.findD k [])
+
+/-- `ls` (in order) in front of `base`. -/
+def prepend (ls : List LocalClause) (base : Locals) : Locals :=
+  if ls.isEmpty then base else
+  -- oldest first, so that each list keeps the newest clause at its head
+  let (_, r) := ls.foldr (init := (base.count, base)) fun lc (n, r) =>
+    match lc.head with
+    | some h =>
+      let e := (n, lc)
+      let r := { r with byPred := cons r.byPred h.idx e }
+      let r := match lc.key with
+        | .flex => { r with flex := cons r.flex h.idx e }
+        | k => { r with byKey := cons r.byKey (h.idx, k) e }
+      (n + 1, r)
+    | none => (n + 1, { r with unknown := r.unknown + 1 })
+  { r with list := ls ++ base.list, count := base.count + ls.length }
+
+/-- Merge two lists ordered newest first. -/
+private partial def mergeNewest (a b : List (Nat × LocalClause)) (acc : Array LocalClause) :
+    Array LocalClause :=
+  match a, b with
+  | [], [] => acc
+  | (_, x) :: a', [] => mergeNewest a' [] (acc.push x)
+  | [], (_, y) :: b' => mergeNewest [] b' (acc.push y)
+  | (i, x) :: a', (j, y) :: b' =>
+    if i > j then mergeNewest a' b (acc.push x) else mergeNewest a b' (acc.push y)
+
+-- @tg: implements:: [[openspec:elpi-core-engine#Hypothesis indexing]]
+/-- The hypotheses for predicate `c` that can match a call whose first argument has key `k`,
+newest first. Requires `unknown = 0`. -/
+def candidates (ls : Locals) (c : ConstId) (k : Key) : Array LocalClause :=
+  match k with
+  | .flex => mergeNewest (ls.byPred.findD c.idx []) [] #[]
+  | k => mergeNewest (ls.byKey.findD (c.idx, k) []) (ls.flex.findD c.idx []) #[]
+
+end Locals
 
 /-- A suspended goal with the context it must resume in. -/
 structure Constraint where

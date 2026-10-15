@@ -329,3 +329,17 @@ Other languages reach the engine through a C interface in which programs are num
 - status:: accepted
 - motivated_by:: [[decisions#Monad-generic core and packaging]]
 - introduced_by:: [[changes#add-language-bindings]]
+
+## Allocate less than OCaml
+
+The engine closes its speed gap with ELPI by allocating fewer objects than ELPI does, not by allocating faster: work moves to load time, and hot paths keep shared terms instead of copying them.
+
+**Context.** After [[decisions#Persistent store]] the engine was 1.2 to 10.5 times slower than ELPI 1.18. Sampling showed 40 to 45% of first-order runs in allocation, freeing and reference counting. OCaml allocates by bumping a pointer in a minor heap and never visits dead objects; Lean frees each object through its reference count, so the same allocation volume costs Lean more.
+
+**Decision.** Do at load time what ELPI does at load time: compile clauses into head arguments and body goals, and keep each key's candidate array ready. Index hypotheses by predicate and key. Remove per-step boxes: one record per head-matching step and per unifier equation, clause variables without `Option`. Keep sharing where the input is shared (stored clause bodies, normalised terms) and fuse relocation with β-reduction where a fresh copy was rebuilt twice. Do not add sharing where the input is fresh: Lean updates a uniquely owned term in place, and the pointer test would keep the original alive and force a copy, which measured 20% slower on `lambda3`.
+
+**Consequences.** See [[papers/engine#A Persistent Abstract Machine for Lambda Prolog#Performance expectations]] for the measured effect. The remaining gap is the checkpoint record per attempt, the occurs-check walk ELPI also does, and machine bookkeeping. Each change is checked against the oracle, the upstream suite and `tests/Core/ClauseSelection.lean`.
+
+- status:: accepted
+- motivated_by:: [[decisions#Native Lean engine]]
+- introduced_by:: [[changes#optimize-clause-selection]]

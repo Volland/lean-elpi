@@ -327,7 +327,7 @@ def CompiledProgram.prepareTm (p : CompiledProgram) (t : STm) (fuel : Nat := def
     vars := vars.push (.uvar u #[])
     if n != "_" && !n.startsWith "_" then names := names.push (n, u)
   let g := Machine.rename vars 0 goal
-  return { machine := { goals := [{ goal := g, depth := 0, locals := [], cutTo := 0 }]
+  return { machine := { goals := [{ goal := g, depth := 0, locals := {}, cutTo := 0 }]
                         store, fuel }
            syms := ls.syms
            names }
@@ -347,7 +347,7 @@ def CompiledProgram.prepareRaw (p : CompiledProgram) (vars : List String)
     store := s'
     vs := vs.push (.uvar u #[])
     names := names.push (n, u)
-  return { machine := { goals := [{ goal := mk vs, depth := 0, locals := [], cutTo := 0 }], store, fuel }
+  return { machine := { goals := [{ goal := mk vs, depth := 0, locals := {}, cutTo := 0 }], store, fuel }
            syms := p.syms, names }
 
 /-- Parse, typecheck and lower a query; returns the initial machine. -/

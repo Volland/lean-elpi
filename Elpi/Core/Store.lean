@@ -139,18 +139,18 @@ partial def deref (s : Store) (t : Term) (d : Nat) : Term :=
     match s.lookup? u with
     | none => t
     | some v =>
-      let ℓ := s.levelOf u
-      let v := v.shiftUp ℓ (d - ℓ)
-      deref s (Term.applyAt v args d) d
+      -- relocate from the variable's level while β-reducing, in one pass
+      deref s (Term.applyAtFrom v (s.levelOf u) args d) d
   | _ => t
 
 /-- Fully normalise `t` at depth `d`: dereference every assigned variable. -/
 partial def zonk (s : Store) (t : Term) (d : Nat) : Term :=
-  match deref s t d with
-  | .app h as => .app (zonk s h d) (as.map (zonk s · d))
-  | .lam b => .lam (zonk s b (d + 1))
-  | .uvar u as => .uvar u (as.map (zonk s · d))
-  | .cvar i as => .cvar i (as.map (zonk s · d))
+  let t := deref s t d
+  match t with
+  | .app h as => Term.updApp t h as (zonk s h d) (as.mapMono (zonk s · d))
+  | .lam b => Term.updLam t b (zonk s b (d + 1))
+  | .uvar u as => Term.updUVar t u as (as.mapMono (zonk s · d))
+  | .cvar i as => Term.updCVar t i as (as.mapMono (zonk s · d))
   | t => t
 
 end Store

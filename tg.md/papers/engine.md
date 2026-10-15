@@ -291,7 +291,7 @@ The machine state at an answer is a value, so the stream's tail is just "backtra
 
 Clause selection uses first-argument indexing: clauses are grouped by the head symbol of their first argument, so a call skips clauses that cannot match.
 
-The [[components#Clause index]] maps each predicate to buckets keyed by the outermost constructor of the first argument (`elpi-core-engine › First-argument indexing`). A call whose first argument is `cons _ _` looks only at the `cons` bucket plus the clauses whose first argument is a variable. Candidates are returned in original clause order, because order is semantics. For `append` above, a call with a non-empty first list never tries the `[]` clause and never pushes a useless choice point (scenario "Clauses with a non-matching first argument are skipped"). Deep and multi-argument `:index` directives are deferred ([[decisions#Staged language surface]]); the index accepts them syntactically and falls back to first-argument indexing.
+The [[components#Clause index]] maps each predicate to buckets keyed by the outermost constructor of the first argument (`elpi-core-engine › First-argument indexing`). A call whose first argument is `cons _ _` looks only at the `cons` bucket, which already holds the clauses whose first argument is a variable; the buckets are built when clauses are added, so a call allocates nothing to choose its candidates. Candidates are returned in original clause order, because order is semantics. For `append` above, a call with a non-empty first list never tries the `[]` clause and never pushes a useless choice point (scenario "Clauses with a non-matching first argument are skipped"). Deep and multi-argument `:index` directives are deferred ([[decisions#Staged language surface]]); the parser skips `:index` on a clause and keeps first-argument indexing, but does not yet accept it before a `pred` declaration.
 
 ## Spilling and grafting
 
@@ -382,18 +382,29 @@ Beyond CHR written in ELPI, the [[decisions#Tiered solver API]] lets Lean code p
 
 ## Performance expectations
 
-Expected 3 to 10 times slower than OCaml ELPI; measured 4 to 142 times on 0.3.0 and 1.1 to 10.7 times (3 by geometric mean) now ([[components#Benchmark harness]]).
+Expected 3 to 10 times slower than OCaml ELPI; measured 4 to 142 times on 0.3.0, 1.1 to 10.5 (2.4 by geometric mean) after the store rewrite, and 1.1 to 4.6 (1.9) now ([[components#Benchmark harness]]).
 
 On 0.3.0 some programs also ran out of memory; the engine now uses tens to hundreds of megabytes.
 
 The 0.3.0 numbers were not caused by Lean or by interpreting clause bodies. Profiling found three specific costs: unification rebuilt the whole term every time it bound a variable (quadratic on lists); the persistent map copied a path of nodes per binding; and hypotheses added with `=>` were tried one by one, with goal arguments dereferenced again at every step. They are fixed by binding clause variables during head matching, the trail described above, a first-order fast path in the unifier, an index on hypotheses (eigenvariables included) and one-pass β-reduction.
 
-What remains is mostly allocation: a clause body is rebuilt as a term on every call, and Lean's reference counting frees it again. Optimisations still open, in rough order:
+A second profile found the rest of the gap in allocation: 40 to 45% of first-order runs went to allocating, freeing and reference counting, which costs Lean more than OCaml's young heap ([[decisions#Allocate less than OCaml]]). The second round took from ELPI's runtime what it does at load time, compiled clauses and ready candidate arrays, and indexed hypotheses by predicate and key. It fused relocation with β-reduction in dereferencing, which had been 38% of `lambda3`, and removed the per-step pairs and `Option` boxes of head matching and the unifier.
 
-1. **Clause precompilation**: heads compiled to matching code and bodies to goal sequences, so a call allocates only what it binds. Indexing beyond the first argument once `:index` is supported.
-2. **Hash-consing and sharing** of ground terms, already used for reflected Lean terms; a cached "closed" bit would let β-reduction and the scope scan skip them.
+| Program | ELPI 1.18 (s) | after the store rewrite | now | now / ELPI |
+|---|---|---|---|---|
+| lambda3 | 0.28 | 2.84 | 1.29 | 4.6× |
+| mu | 1.28 | 6.07 | 5.45 | 4.3× |
+| crypt | 2.21 | 10.48 | 9.29 | 4.2× |
+| fast_mu | 0.88 | 4.04 | 3.25 | 3.7× |
+| cbn | 0.24 | 0.78 | 0.73 | 3.0× |
+| queens | 0.90 | 3.26 | 2.63 | 2.9× |
+
+Optimisations still open, in rough order:
+
+1. **Lighter checkpoints**: a choice point or attempt copies the `Store` record (about 5% of `queens` and `mu`); ELPI keeps a trail pointer and skips trailing on a last call.
+2. **Indexing beyond the first argument**: `:index` before a `pred` declaration is not parsed yet, so `index2`, `deep_index` and `dt` do not load; once it is, multi-argument and deep indexing.
 3. **Store compaction**: the arrays grow with every variable created in a long deterministic run, because nothing reclaims variables no goal can reach.
-4. **Deeper dereferencing**: path compression for chains of pruned variables, which dominate `lambda3`.
+4. **Hash-consing** of ground terms and a cached "closed" bit, so relocation and the occurs check can skip them.
 
 Because the machine talks to the substitution only through the `Store` interface, each of these can land without touching resolution, cut or constraints, and the oracle keeps every step honest.
 

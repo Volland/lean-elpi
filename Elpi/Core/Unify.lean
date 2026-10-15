@@ -165,7 +165,12 @@ def solveFlex (s : Store) (x : UVarId) (xs : Array Term) (t : Term) (d : Nat) : 
 /-- η-expansion step for a term meeting a λ at depth `d`. -/
 def etaApp (t : Term) (d : Nat) : Term := Term.mkApp (t.shiftUp d 1) #[.bound d]
 
-abbrev Eqn := Term × Term × Nat
+/-- An equation `a = b` at depth `d` on the unifier's worklist (one object, not a nested pair). -/
+structure Eqn where
+  a : Term
+  b : Term
+  d : Nat
+  deriving Inhabited
 
 /-- Unassigned variables occurring in `t` (flexible heads and arguments), without repeats. -/
 partial def collectUVars (s : Store) (t : Term) (d : Nat) (acc : Array UVarId := #[]) :
@@ -194,7 +199,7 @@ def assignable (protect : Nat) (u : UVarId) : Bool := u.idx ≥ protect
 def delayEqn (s : Store) (a b : Term) (d : Nat) : Store :=
   let keys := collectUVars s b d (collectUVars s a d)
   let (_, cs) := s.cstore.add
-    { id := 0, goal := .app (.const eqConst) #[a, b], keys, depth := d, locals := [],
+    { id := 0, goal := .app (.const eqConst) #[a, b], keys, depth := d, locals := {},
       pred := none }
   { s with cstore := cs }
 
@@ -229,7 +234,9 @@ store holds the bindings made so far, which the caller undoes through its checkp
 persistent copy would cost a full array copy per attempt). -/
 partial def loop (protect : Nat) (s : Store) : List Eqn → Store × Bool
   | [] => (s, true)
-  | (a, b, d) :: rest =>
+  | ⟨a, b, d⟩ :: rest =>
+    -- the same object on both sides (shared subterms are common after renaming): nothing to do
+    if Term.sameRef a b then loop protect s rest else
     let a := s.deref a d
     let b := s.deref b d
     -- pattern unification could not decide: ask the hooks, then delay or fail
@@ -282,9 +289,9 @@ partial def loop (protect : Nat) (s : Store) : List Eqn → Store × Bool
       | .ok => loop protect s' rest
       | .fail => (s', false)
       | .delay => stuck protect s' a b d rest false
-    | .lam x, .lam y => loop protect s ((x, y, d + 1) :: rest)
-    | .lam x, t => loop protect s ((x, etaApp t d, d + 1) :: rest)
-    | t, .lam y => loop protect s ((etaApp t d, y, d + 1) :: rest)
+    | .lam x, .lam y => loop protect s (⟨x, y, d + 1⟩ :: rest)
+    | .lam x, t => loop protect s (⟨x, etaApp t d, d + 1⟩ :: rest)
+    | t, .lam y => loop protect s (⟨etaApp t d, y, d + 1⟩ :: rest)
     | .const c, .const c' => if c == c' then loop protect s rest else clashed protect s a b d rest
     | .bound l, .bound l' => if l == l' then loop protect s rest else (s, false)
     | .lit l, .lit l' => if l == l' then loop protect s rest else (s, false)
@@ -302,7 +309,10 @@ partial def loop (protect : Nat) (s : Store) : List Eqn → Store × Bool
 where
   zipEqns (as as' : Array Term) (d : Nat) (rest : List Eqn) : List Eqn :=
     let rec go (i : Nat) (acc : List Eqn) : List Eqn :=
-      if i = 0 then acc else go (i - 1) ((as[i - 1]!, as'[i - 1]!, d) :: acc)
+      if i = 0 then acc else
+      let x := as[i - 1]!
+      let y := as'[i - 1]!
+      go (i - 1) (if Term.sameRef x y then acc else ⟨x, y, d⟩ :: acc)
     go (min as.size as'.size) rest
   /-- A rigid clash fails, unless the hooks interpret the constants involved. -/
   clashed (protect : Nat) (s : Store) (a b : Term) (d : Nat) (rest : List Eqn) : Store × Bool :=
@@ -317,7 +327,7 @@ where
     | .decline => if declineFails then (s, false) else loop protect (delayEqn s a b d) rest
     | .fail => (s, false)
     | .suspend => loop protect (delayEqn s a b d) rest
-    | .solved eqs => loop protect s (eqs.map (fun (p, q) => (p, q, d)) ++ rest)
+    | .solved eqs => loop protect s (eqs.map (fun (p, q) => ⟨p, q, d⟩) ++ rest)
 
 end Unify
 
@@ -326,12 +336,12 @@ failure the store holds partial bindings: undo them with the `Store.checkpoint` 
 the call, with the store in `Store.track` mode. This is the allocation-free form the machine
 uses; `unify` below is the persistent-style convenience. -/
 def unifyRaw (s : Store) (a b : Term) (d : Nat) : Store × Bool :=
-  Unify.loop s.protect s [(a, b, d)]
+  Unify.loop s.protect s [⟨a, b, d⟩]
 
 /-- Match-mode `unifyRaw` for input arguments: variables with an index below `protect` (the
 call's own variables) may not be assigned. -/
 def unifyMatchRaw (s : Store) (protect : Nat) (a b : Term) (d : Nat) : Store × Bool :=
-  Unify.loop (max protect s.protect) s [(a, b, d)]
+  Unify.loop (max protect s.protect) s [⟨a, b, d⟩]
 
 /-- Unify `a` and `b` at depth `d`; problems outside the pattern fragment are suspended
 as constraints in `Store.cstore`, after the registered hooks (if any) were consulted.

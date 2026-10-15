@@ -109,14 +109,29 @@ def constIdOf (n : String) : ConstId :=
 def Symbols.userNames (s : Symbols) : List String :=
   s.ids.toList.filterMap fun (n, i) => if i < reservedNames.size then none else some n
 
-/-- A compiled clause; `cvar i` ranges over `i < nvars`. -/
+/-- A compiled clause; `cvar i` ranges over `i < nvars`. `args` and `goals` are filled by
+`Clause.compile` when the clause enters a `PredDB`: the head's arguments, and the body as a
+flat sequence of goals (top-level `,` split, `true` dropped). -/
 structure Clause where
   head : Term
   body : Term
   nvars : Nat
   name? : Option String := none
   pos : Pos := {}
+  args : Array Term := #[]
+  goals : Array Term := #[]
   deriving Inhabited
+
+/-- The goals of a clause body: conjunctions split, `true` dropped, in order. -/
+partial def flattenBody (t : Term) (acc : Array Term := #[]) : Array Term :=
+  match t with
+  | .app (.const c) #[a, b] => if c == cConj then flattenBody b (flattenBody a acc) else acc.push t
+  | .const c => if c == cTrue then acc else acc.push t
+  | _ => acc.push t
+
+-- @tg: implements:: [[openspec:elpi-core-engine#Compiled clauses and term sharing]]
+def Clause.compile (c : Clause) : Clause :=
+  { c with args := (match c.head with | .app _ as => as | _ => #[]), goals := flattenBody c.body }
 
 def Key.ofTerm : Term → Key
   | .const c => .const c
@@ -132,42 +147,61 @@ def firstKey (t : Term) : Key :=
   | .app _ as => if h : 0 < as.size then Key.ofTerm as[0] else .flex
   | _ => .flex
 
-/-- The clauses of one predicate, in search order, with a first-argument index. -/
+/-- The clauses of one predicate, in search order, with a first-argument index whose candidate
+arrays are ready to use: the bucket of a key holds the clauses with that key and the clauses
+with a variable first argument, in clause order. -/
 structure PredDB where
+  /-- Every clause, compiled, in search order. -/
   clauses : Array Clause := #[]
-  byKey : Lean.PersistentHashMap Key (Array Nat) := {}
-  flex : Array Nat := #[]
+  byKey : Lean.PersistentHashMap Key (Array Clause) := {}
+  /-- The clauses whose first argument is a variable: the candidates for a key with no bucket. -/
+  flex : Array Clause := #[]
   deriving Inhabited
 
 namespace PredDB
 
+/-- Add a clause at the end. A clause with a variable first argument joins every bucket. -/
 def push (db : PredDB) (c : Clause) : PredDB :=
-  let i := db.clauses.size
-  let k := firstKey c.head
-  let db := { db with clauses := db.clauses.push c }
-  match k with
-  | .flex => { db with flex := db.flex.push i }
-  | k => { db with byKey := db.byKey.insert k ((db.byKey.findD k #[]).push i) }
+  let c := c.compile
+  let clauses := db.clauses.push c
+  match firstKey c.head with
+  | .flex =>
+    let byKey := db.byKey.foldl (init := db.byKey) fun m k b => m.insert k (b.push c)
+    { clauses, byKey, flex := db.flex.push c }
+  | k => { db with clauses, byKey := db.byKey.insert k ((db.byKey.findD k db.flex).push c) }
 
-/-- Ordered merge of two ascending index arrays. -/
-def merge (a b : Array Nat) : Array Nat := Id.run do
-  let mut out := Array.mkEmpty (a.size + b.size)
-  let mut i := 0
-  let mut j := 0
-  while i < a.size || j < b.size do
-    if j ≥ b.size || (i < a.size && a[i]! < b[j]!) then
-      out := out.push a[i]!; i := i + 1
-    else
-      out := out.push b[j]!; j := j + 1
-  return out
+/-- Build the index of a whole predicate at once, in time linear in the size of its buckets. -/
+def ofArray (cs : Array Clause) : PredDB := Id.run do
+  let cs := cs.map Clause.compile
+  let keys := cs.map (firstKey ·.head)
+  -- positions of each key, ascending
+  let mut pos : Std.HashMap Key (Array Nat) := {}
+  let mut flexPos : Array Nat := #[]
+  for i in [0:cs.size] do
+    match keys[i]! with
+    | .flex => flexPos := flexPos.push i
+    | k => pos := pos.insert k ((pos.getD k #[]).push i)
+  let mut byKey : Lean.PersistentHashMap Key (Array Clause) := {}
+  for (k, ps) in pos.toList do
+    -- ordered merge of the key's positions with the variable-headed ones
+    let mut out : Array Clause := Array.mkEmpty (ps.size + flexPos.size)
+    let mut i := 0
+    let mut j := 0
+    while i < ps.size || j < flexPos.size do
+      if j ≥ flexPos.size || (i < ps.size && ps[i]! < flexPos[j]!) then
+        out := out.push cs[ps[i]!]!; i := i + 1
+      else
+        out := out.push cs[flexPos[j]!]!; j := j + 1
+    byKey := byKey.insert k out
+  return { clauses := cs, byKey, flex := flexPos.map (cs[·]!) }
 
-/-- Candidate clause positions for a call whose first argument has key `k`: the bucket of
-`k` merged with the variable clauses, in clause order. -/
+/-- Candidate clauses for a call whose first argument has key `k`, in clause order. Nothing is
+built here: the array was prepared when the clauses were added. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#First-argument indexing]]
-def candidates (db : PredDB) (k : Key) : Array Nat :=
+def candidates (db : PredDB) (k : Key) : Array Clause :=
   match k with
-  | .flex => Array.range db.clauses.size
-  | k => merge (db.byKey.findD k #[]) db.flex
+  | .flex => db.clauses
+  | k => db.byKey.findD k db.flex
 
 end PredDB
 
@@ -222,7 +256,7 @@ structure Database where
 
 def Database.ofLists (lists : Std.HashMap Nat (Array Clause)) : Database :=
   { preds := lists.fold (init := {}) fun m p cs =>
-      m.insert ⟨p⟩ (cs.foldl PredDB.push {}) }
+      m.insert ⟨p⟩ (PredDB.ofArray cs) }
 
 /-- Add a clause at the end of its predicate; the original database is untouched. -/
 def Database.assert (db : Database) (p : ConstId) (c : Clause) : Database :=

@@ -31,18 +31,13 @@ structure Frame where
   ldepth : Nat := 0
   deriving Inhabited
 
-/-- A clause candidate for a call. -/
-inductive Cand where
-  | static (c : Clause)
-  | local (lc : LocalClause)
-  deriving Inhabited
-
 /-- What a choice point will try when backtracked into. -/
 inductive Alt where
   /-- The second branch of a disjunction. -/
   | frame (f : Frame)
-  /-- Remaining candidate clauses of a call. -/
-  | clauses (call : Frame) (cands : Array Cand) (next : Nat)
+  /-- Remaining candidate clauses of a call: the hypotheses `locs`, then the static clauses
+  `stat` (an array prepared by the index, shared, never copied); `next` counts across both. -/
+  | clauses (call : Frame) (locs : Array LocalClause) (stat : Array Clause) (next : Nat)
   /-- Remaining alternatives of a builtin. -/
   | stream (call : Frame) (rest : LazyList (Array Term))
   deriving Inhabited
@@ -126,96 +121,111 @@ def argsOf : Term → Array Term
   | .app _ as => as
   | _ => #[]
 
+/-- Placeholder for a clause variable that is not bound yet. A goal term never contains a
+`cvar` (renaming replaces them all), so the placeholder cannot be confused with a binding. -/
+def unsetVar : Term := .cvar 0 #[]
+
+@[inline] def isUnset : Term → Bool
+  | .cvar .. => true
+  | _ => false
+
 /-- Give every still-unbound clause variable a fresh unification variable at depth `d`. -/
-def fillVars (s : Store) (vars : Array (Option Term)) (d : Nat) : Store × Array Term := Id.run do
+def fillVars (s : Store) (vars : Array Term) (d : Nat) : Store × Array Term := Id.run do
   let mut s := s
-  let mut out : Array Term := Array.mkEmpty vars.size
-  for v in vars do
-    match v with
-    | some t => out := out.push t
-    | none =>
+  let mut vars := vars
+  for i in [0:vars.size] do
+    if isUnset vars[i]! then
       let (u, s') := s.fresh d
       s := s'
-      out := out.push (.uvar u #[])
-  return (s, out)
+      vars := vars.set! i (.uvar u #[])
+  return (s, vars)
+
+/-- Result of matching (part of) a clause head: one allocation per step instead of a tuple of
+tuples. The store is always returned; after a failure it holds partial bindings to undo. -/
+structure HM where
+  st : Store
+  vars : Array Term
+  ok : Bool
+
+instance : Inhabited HM := ⟨⟨default, #[], false⟩⟩
+
+/-- General unification of a head argument: match mode (goal variables below `boundary` frozen)
+on input positions. -/
+@[inline] def genUnify (isIn : Bool) (boundary : Nat) (st : Store) (a b : Term) (d : Nat) :
+    Store × Bool :=
+  if isIn then unifyMatchRaw st boundary a b d else unifyRaw st a b d
 
 /-- Match a clause-head term `h` against the goal term `g` at depth `d`. The first occurrence
 of a clause variable is bound directly to the goal's subterm, so no unification variable is
 created and no scope check walks the (possibly huge) subterm; every other case falls back to
-general unification of the instantiated head. `gen` is the general unifier of the argument.
-The store is always returned; after a failure it holds partial bindings for the caller to undo. -/
-partial def hmatch (gen : Store → Term → Term → Store × Bool) (st : Store)
-    (vars : Array (Option Term)) (h g : Term) (d : Nat) :
-    Store × Array (Option Term) × Bool :=
+general unification of the instantiated head (`genUnify`). -/
+partial def hmatch (isIn : Bool) (boundary : Nat) (st : Store) (vars : Array Term) (h g : Term)
+    (d : Nat) : HM :=
   match h with
   | .cvar i args =>
     if args.isEmpty then
-      match vars[i]! with
-      | none => (st, vars.set! i (some g), true)
-      | some t => let (st', ok) := gen st t g; (st', vars, ok)
-    else fallback gen st vars h g d
+      let t := vars[i]!
+      if isUnset t then ⟨st, vars.set! i g, true⟩
+      else let (st', ok) := genUnify isIn boundary st t g d; ⟨st', vars, ok⟩
+    else fallback isIn boundary st vars h g d
   | .const c =>
     match st.deref g d with
-    | .const c' => if c == c' then (st, vars, true) else clash gen st vars h g d
-    | .uvar .. | .lam _ => fallback gen st vars h g d
-    | _ => clash gen st vars h g d
+    | .const c' => if c == c' then ⟨st, vars, true⟩ else clash isIn boundary st vars h g d
+    | .uvar .. | .lam _ => fallback isIn boundary st vars h g d
+    | _ => clash isIn boundary st vars h g d
   | .app (.const c) hargs =>
     match st.deref g d with
     | .app (.const c') gargs =>
       if c == c' && hargs.size == gargs.size then
-        matchArgs gen st vars hargs gargs d 0
-      else clash gen st vars h g d
-    | .uvar .. | .lam _ => fallback gen st vars h g d
-    | _ => clash gen st vars h g d
-  | _ => fallback gen st vars h g d
+        matchArgs isIn boundary st vars hargs gargs d 0
+      else clash isIn boundary st vars h g d
+    | .uvar .. | .lam _ => fallback isIn boundary st vars h g d
+    | _ => clash isIn boundary st vars h g d
+  | _ => fallback isIn boundary st vars h g d
 where
-  matchArgs (gen : Store → Term → Term → Store × Bool) (st : Store) (vars : Array (Option Term))
-      (hargs gargs : Array Term) (d : Nat) (i : Nat) : Store × Array (Option Term) × Bool :=
+  matchArgs (isIn : Bool) (boundary : Nat) (st : Store) (vars : Array Term)
+      (hargs gargs : Array Term) (d : Nat) (i : Nat) : HM :=
     if h : i < hargs.size then
-      match hmatch gen st vars hargs[i] gargs[i]! d with
-      | (st', vars', true) => matchArgs gen st' vars' hargs gargs d (i + 1)
+      match hmatch isIn boundary st vars hargs[i] gargs[i]! d with
+      | ⟨st', vars', true⟩ => matchArgs isIn boundary st' vars' hargs gargs d (i + 1)
       | r => r
-    else (st, vars, true)
-  fallback (gen : Store → Term → Term → Store × Bool) (st : Store) (vars : Array (Option Term))
-      (h g : Term) (d : Nat) : Store × Array (Option Term) × Bool :=
+    else ⟨st, vars, true⟩
+  fallback (isIn : Bool) (boundary : Nat) (st : Store) (vars : Array Term) (h g : Term) (d : Nat) :
+      HM :=
     let (st1, vs) := fillVars st vars d
-    let (st2, ok) := gen st1 (Term.renameCVars vs d h) g
-    (st2, vs.map some, ok)
+    let (st2, ok) := genUnify isIn boundary st1 (Term.renameCVars vs d h) g d
+    ⟨st2, vs, ok⟩
   -- a rigid clash fails outright unless hooks may interpret the constants
-  clash (gen : Store → Term → Term → Store × Bool) (st : Store) (vars : Array (Option Term))
-      (h g : Term) (d : Nat) : Store × Array (Option Term) × Bool :=
-    if st.hooks.isEmpty then (st, vars, false) else fallback gen st vars h g d
+  clash (isIn : Bool) (boundary : Nat) (st : Store) (vars : Array Term) (h g : Term) (d : Nat) :
+      HM :=
+    if st.hooks.isEmpty then ⟨st, vars, false⟩ else fallback isIn boundary st vars h g d
 
 /-- Match head arguments `i…` of a clause against the call's, threading the store and the clause
 variables. Explicit recursion rather than a `for` loop with `return`: do-notation would keep
 the previous store in the loop's result state, a second reference that forces every update to
 copy the store's arrays. -/
 partial def matchArgs (modes : Option (Array Mode)) (boundary d : Nat) (hargs gargs : Array Term)
-    (i : Nat) (st : Store) (vars : Array (Option Term)) : Store × Array (Option Term) × Bool :=
+    (i : Nat) (st : Store) (vars : Array Term) : HM :=
   if h : i < hargs.size then
     let isIn : Bool := match modes with | some ms => (ms.getD i Mode.o) == Mode.i | none => false
-    let gen : Store → Term → Term → Store × Bool :=
-      if isIn then fun s a b => unifyMatchRaw s boundary a b d else fun s a b => unifyRaw s a b d
-    match hmatch gen st vars hargs[i] gargs[i]! d with
-    | (st', vars', true) => matchArgs modes boundary d hargs gargs (i + 1) st' vars'
+    match hmatch isIn boundary st vars hargs[i] gargs[i]! d with
+    | ⟨st', vars', true⟩ => matchArgs modes boundary d hargs gargs (i + 1) st' vars'
     | r => r
-  else (st, vars, true)
+  else ⟨st, vars, true⟩
 
-/-- Instantiate a static clause for the call arguments `gargs` at depth `d`: match the head
-argument by argument (match mode on input positions), then instantiate the body. The store
-is returned in every case; `none` means the head does not match. -/
+/-- Instantiate a compiled static clause for the call arguments `gargs` at depth `d`: match the
+head argument by argument (match mode on input positions), then instantiate the body goals. The
+store is returned in every case; `none` means the head does not match. -/
 def matchClause (c : Clause) (modes : Option (Array Mode)) (s : Store) (boundary : Nat)
-    (gargs : Array Term) (d : Nat) : Store × Option Term :=
-  let hargs := argsOf c.head
+    (gargs : Array Term) (d : Nat) : Store × Option (Array Term) :=
+  let hargs := c.args
   if hargs.size != gargs.size then (s, none) else
-  match matchArgs modes boundary d hargs gargs 0 s (Array.replicate c.nvars none) with
-  | (st, _, false) => (st, none)
-  | (st, vars, true) =>
-    match c.body with
-    | .const k =>
-      if k == cTrue then (st, some c.body)
-      else let (st', vs) := fillVars st vars d; (st', some (Term.renameCVars vs d c.body))
-    | _ => let (st', vs) := fillVars st vars d; (st', some (Term.renameCVars vs d c.body))
+  match matchArgs modes boundary d hargs gargs 0 s (Array.replicate c.nvars unsetVar) with
+  | ⟨st, _, false⟩ => (st, none)
+  | ⟨st, vars, true⟩ =>
+    if c.goals.isEmpty then (st, some #[]) else
+    let (st', vs) := fillVars st vars d
+    (st', some (c.goals.map (Term.renameCVars vs d)))
 
 /-- Peel `pi` quantifiers and `:-` off a hypothetical clause used at depth `d`. -/
 partial def instLocal (lc : LocalClause) (s : Store) (d : Nat) : Store × Term × Term :=
@@ -344,41 +354,42 @@ def applyHandler (name : String) (s : Store) (f : Frame) (cutTo : Nat) (res : Ha
     let cs := keep.foldl (fun cs c => (cs.add { c with owner := some name }).2) cs
     some (setState st? { s with cstore := cs }, [])
 
-/-- The goal list after selecting a clause: its body (unless it is `true`) on top of the
-continuation. -/
-def bodyGoals (goals : List Frame) (b : Term) (d : Nat) (call : Frame) (barrier : Nat) : List Frame :=
-  match b with
-  | .const c => if c == cTrue then goals
-                else { goal := b, depth := d, locals := call.locals, cutTo := barrier, ldepth := call.ldepth } :: goals
-  | _ => { goal := b, depth := d, locals := call.locals, cutTo := barrier, ldepth := call.ldepth } :: goals
+/-- The goal list after selecting a clause: its body goals (`true` dropped) on top of the
+continuation, each with the call's cut barrier. -/
+def bodyGoals (goals : List Frame) (bs : Array Term) (d : Nat) (call : Frame) (barrier : Nat) : List Frame :=
+  bs.foldr (init := goals) fun b acc =>
+    match b with
+    | .const c => if c == cTrue then acc
+                  else { goal := b, depth := d, locals := call.locals, cutTo := barrier, ldepth := call.ldepth } :: acc
+    | _ => { goal := b, depth := d, locals := call.locals, cutTo := barrier, ldepth := call.ldepth } :: acc
 
 /-- The outcome of looking through the candidate clauses of a call for one whose head matches. -/
 structure Pick where
   /-- The store after the match (a failed search leaves the store as it was). -/
   store : Store
-  /-- The instantiated body of the matching clause; `none` when no candidate matched. -/
-  body : Option Term := none
+  /-- The instantiated body goals of the matching clause; `none` when no candidate matched. -/
+  body : Option (Array Term) := none
   /-- Position in `cands` of the matching clause. -/
   index : Nat := 0
   /-- Checkpoint taken just before the matching attempt. -/
   cp : Store := {}
   deriving Inhabited
 
-/-- Try `cands[i:]` in order. This is pure code on purpose: the store is consumed here and handed
-back, so its arrays are updated in place (monadic code would capture it in continuations). -/
-partial def pickClause (cands : Array Cand) (modes : Option (Array Mode)) (boundary d : Nat)
-    (gargs : Array Term) (s : Store) (i : Nat) : Pick :=
-  if i < cands.size then
+/-- Try candidate `i` and the ones after it, hypotheses `locs` first, then static clauses `stat`.
+This is pure code on purpose: the store is consumed here and handed back, so its arrays are
+updated in place (monadic code would capture it in continuations). -/
+partial def pickClause (locs : Array LocalClause) (stat : Array Clause) (modes : Option (Array Mode))
+    (boundary d : Nat) (gargs : Array Term) (s : Store) (i : Nat) : Pick :=
+  if i < locs.size + stat.size then
     let cp := s.checkpoint
-    let (s1, r) : Store × Option Term :=
-      match cands[i]! with
-      | .static c => matchClause c modes s.track boundary gargs d
-      | .local lc =>
-        let (s2, h, b) := instLocal lc s.track d
+    let (s1, r) : Store × Option (Array Term) :=
+      if h : i < locs.size then
+        let (s2, h, b) := instLocal locs[i] s.track d
         let (s3, ok) := unifyHead modes s2 boundary (argsOf h) gargs d
-        (s3, if ok then some b else none)
+        (s3, if ok then some #[b] else none)
+      else matchClause stat[i - locs.size]! modes s.track boundary gargs d
     match r with
-    | none => pickClause cands modes boundary d gargs (s1.undo cp) (i + 1)
+    | none => pickClause locs stat modes boundary d gargs (s1.undo cp) (i + 1)
     | some b => { store := s1, body := some b, index := i, cp }
   else { store := s }
 
@@ -417,29 +428,29 @@ partial def backtrack {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m
   let M' : Machine σ := { M with choices, goals := cp.goals, resume := false }
   match cp.alt with
   | .frame f => return .cont { M' with goals := f :: cp.goals } s
-  | .clauses call cands next => tryClauses env M' s call cands next
+  | .clauses call locs stat next => tryClauses env M' s call locs stat next
   | .stream call rest => tryStream env M' s call rest
 
 /-- Try the candidate clauses `cands[next:]` for `call`. `M.goals` is the continuation. -/
 partial def tryClauses {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
-    (env : Env m) (M : Machine σ) (s : Store) (call : Frame) (cands : Array Cand) (next : Nat) :
-    m (SR σ) := do
+    (env : Env m) (M : Machine σ) (s : Store) (call : Frame) (locs : Array LocalClause)
+    (stat : Array Clause) (next : Nat) : m (SR σ) := do
   let d := call.depth
   let goal := s.deref call.goal d
   let gargs := argsOf goal
   let pred : Option ConstId := match goal with
     | .app (.const c) _ => some c | .const c => some c | _ => none
   let modes := pred.bind fun c => env.modes[c.idx]?
-  let p := pickClause cands modes s.nextVar d gargs s next
+  let p := pickClause locs stat modes s.nextVar d gargs s next
   match p.body with
   | none => backtrack env M p.store
   | some b =>
     let barrier := M.choices.size
     -- push an alternative if further candidates remain
-    if p.index + 1 < cands.size then
+    if p.index + 1 < locs.size + stat.size then
       let host ← Backtrackable.save
       let choices := M.choices.push
-        { goals := M.goals, store := p.cp, host, alt := .clauses call cands (p.index + 1) }
+        { goals := M.goals, store := p.cp, host, alt := .clauses call locs stat (p.index + 1) }
       return .cont { M with goals := bodyGoals M.goals b d call barrier, choices } p.store
     else
       return .cont { M with goals := bodyGoals M.goals b d call barrier } (p.store.settle p.cp)
@@ -601,7 +612,7 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
                               choices := M.choices.push cp } s.track
       else if c == cImpl && args.size == 2 then
         let ls := toLocals s args[0]! d
-        return .cont { M with goals := { f with goal := args[1]!, locals := ls ++ f.locals } :: rest } s
+        return .cont { M with goals := { f with goal := args[1]!, locals := Locals.prepend ls f.locals } :: rest } s
       else if c == cPi && args.size == 1 then
         let g' := match s.deref args[0]! d with
           | .lam b => b
@@ -703,32 +714,34 @@ partial def callPred {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m 
       -- normalise the arguments' heads once: later steps then find them already dereferenced
       let args := args.map (s.deref · d)
       let key := if h : 0 < args.size then Key.ofTerm args[0] else .flex
-      let mut cands : Array Cand := #[]
-      for lc in f.locals do
-        let ok :=
-          match lc.head with
-          | some h => h == c && lc.key.compatible key
-          | none => localHead s lc.term lc.depth == some c &&
-                    (localKey s lc.depth lc.term lc.depth).compatible key
-        if ok then cands := cands.push (.local lc)
-      match env.db.preds.find? c with
-      | some db =>
-        for i in db.candidates key do
-          cands := cands.push (.static db.clauses[i]!)
-      | none => pure ()
+      let mut locs : Array LocalClause := #[]
+      if f.locals.unknown == 0 then
+        -- only the hypotheses about this predicate that the first argument allows
+        locs := if f.locals.count == 0 then #[] else f.locals.candidates c key
+      else
+        for lc in f.locals.list do
+          let ok :=
+            match lc.head with
+            | some h => h == c && lc.key.compatible key
+            | none => localHead s lc.term lc.depth == some c &&
+                      (localKey s lc.depth lc.term lc.depth).compatible key
+          if ok then locs := locs.push lc
+      let stat : Array Clause := match env.db.preds.find? c with
+        | some db => db.candidates key
+        | none => #[]
       -- LF goals go one derivation level deeper; the strategy's bound prunes them
       let isLF := env.lfPreds.contains c.idx
       let nd := if isLF then f.ldepth + 1 else f.ldepth
       let pruned := match env.bound with | some b => isLF && nd > b | none => false
       if pruned then
         backtrack env { M with cutoff := true } s
-      else if cands.isEmpty then
+      else if locs.isEmpty && stat.isEmpty then
         -- unknown predicate without clauses simply fails
         backtrack env M s
       else
         let call : Frame := { f with goal := (if args.isEmpty then .const c else .app (.const c) args),
                                      cutTo := M.choices.size, ldepth := nd }
-        tryClauses env M s call cands 0
+        tryClauses env M s call locs stat 0
 
 /-- Run steps until the machine yields, is exhausted, runs out of fuel or fails. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Abstract machine]]

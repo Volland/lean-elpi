@@ -14,11 +14,14 @@ The term datatype: constants, de Bruijn-level bound variables, applications, λ,
 
 Terms coming from Lean are hash-consed, so reflected `Expr`s share structure.
 
+`renameCVars` (clause instantiation) keeps every subterm that does not change as the same object, so a clause body's ground parts are never copied; `Term.sameRef` is the pointer test. `applyAtFrom` relocates a λ-term from the level it was bound at while β-reducing it, one traversal where `shiftUp` then `applyAt` took two. Sharing in `subst`/`substN`/`shiftUp` was measured and rejected: their input is usually a fresh term that Lean updates in place, and keeping the original alive for the pointer test stops that ([[decisions#Allocate less than OCaml]]).
+
 - module:: Elpi.Core.Term
 - milestone:: M1
 - motivated_by:: [[decisions#Explicit abstract machine]]
 - motivated_by:: [[glossary#Unification variable]]
 - introduced_by:: [[changes#add-elpi-core]]
+- changed_by:: [[changes#optimize-clause-selection]]
 
 ## Parser
 
@@ -46,6 +49,8 @@ Load-time checker for `kind`, `type`, `pred` with modes, prenex polymorphism and
 
 Higher-order pattern unification with occurs check, pruning and scope checks; stuck problems go to hooks or become delayed goals. Source: `Elpi/Core/Unify.lean`.
 
+The worklist holds `Eqn` records (one object per equation) and drops a pair whose two sides are the same object, which renaming with sharing makes common.
+
 - module:: Elpi.Core.Unify
 - milestone:: M1
 - depends_on:: [[components#Term store]]
@@ -53,6 +58,7 @@ Higher-order pattern unification with occurs check, pruning and scope checks; st
 - motivated_by:: [[constraints#Pattern unification is decidable]]
 - motivated_by:: [[glossary#Pattern fragment]]
 - introduced_by:: [[changes#add-elpi-core]]
+- changed_by:: [[changes#optimize-clause-selection]]
 
 ## Persistent substitution
 
@@ -69,15 +75,20 @@ The store of unification variables (bindings in arrays with an undo trail, check
 
 Program database with first-argument indexing, clause names and grafting, accumulate and namespaces. Source: `Elpi/Core/Index.lean`.
 
+A clause is compiled when it enters a `PredDB`: `args` holds the head's arguments and `goals` the body with top-level `,` split and `true` dropped. The candidate array of each first-argument key already includes the variable-headed clauses in clause order (`PredDB.ofArray` builds them in one pass, `push` appends), so `candidates` returns a stored array and allocates nothing, like ELPI's `get_clauses`.
+
 - module:: Elpi.Core.Index
 - milestone:: M1
 - depends_on:: [[components#Term store]]
 - motivated_by:: [[glossary#Clause grafting]]
 - introduced_by:: [[changes#add-elpi-core]]
+- changed_by:: [[changes#optimize-clause-selection]]
 
 ## Abstract machine
 
 The resolution loop: goal stack, choice-point stack, cut barriers, fuel, lazy solution stream, depth-first order. Source: `Elpi/Core/Machine.lean`.
+
+A call keeps its candidates as two arrays, the matching hypotheses and the index's static array, which the choice point shares rather than copies. Head matching returns one `HM` record per step and keeps clause variables in an `Array Term` with the placeholder `unsetVar`, instead of `Option` boxes inside nested pairs. A selected clause pushes one frame per compiled body goal, each with the call's cut barrier.
 
 - module:: Elpi.Core.Machine
 - milestone:: M1
@@ -86,10 +97,13 @@ The resolution loop: goal stack, choice-point stack, cut barriers, fuel, lazy so
 - depends_on:: [[components#Persistent substitution]]
 - motivated_by:: [[decisions#Explicit abstract machine]]
 - introduced_by:: [[changes#add-elpi-core]]
+- changed_by:: [[changes#optimize-clause-selection]]
 
 ## Constraint store
 
 Persistent store of delayed goals keyed by the variables they wait on, the wake-up queue, and slices owned by native handlers. Source: `Elpi/Core/Constraints.lean`, held in `Store.cstore` so choice points capture it.
+
+The same file defines `Locals`, the hypotheses added by `=>`: the ordered list (for CHR contexts and constraint snapshots) and persistent maps by predicate, by predicate and first-argument key, and of variable-keyed hypotheses. `Locals.candidates` merges the last two by insertion order, so a call never looks at hypotheses that cannot apply.
 
 - module:: Elpi.Core.Constraints
 - milestone:: M2
@@ -98,6 +112,7 @@ Persistent store of delayed goals keyed by the variables they wait on, the wake-
 - motivated_by:: [[decisions#Persistent store]]
 - motivated_by:: [[glossary#Delayed goal]]
 - introduced_by:: [[changes#add-elpi-constraints]]
+- changed_by:: [[changes#optimize-clause-selection]]
 
 ## CHR engine
 
@@ -377,7 +392,7 @@ Runs ELPI 1.18's own test programs, copied under `tests/upstream/`, on `lean-elp
 
 Times `lean-elpi`, ELPI 1.18 and, where a program is also a Teyjus module, Teyjus on ELPI's own performance programs plus a few small ones of ours. It reports median and best wall time and peak memory per engine.
 
-`tests/bench/run.py` runs each workload N times (default 5) under one shared stack limit, from `tests/upstream/sources` (the `performance_FO` and `performance_HO` programs) and `tests/bench/programs` (`nrev`, `fib`, `hoabs`, sized to finish on every engine). A run that exits non-zero or exceeds the timeout is recorded as that status, never as a time. Teyjus comes from `TEYJUS_BIN`; it needs OCaml below 5.0. Results are in `tests/bench/results/` (`2026-10-15.json` for 0.3.0, `2026-10-15-optimized.json` after the store rewrite) and published in two blog posts: [Compatibility and performance](site/content/blog/compatibility-and-performance.md) and [Why LeanElpi was slow](site/content/blog/why-leanelpi-was-slow.md). The harness times; it does not compare answers, which is the job of the conformance suites.
+`tests/bench/run.py` runs each workload N times (default 5) under one shared stack limit, from `tests/upstream/sources` (the `performance_FO` and `performance_HO` programs) and `tests/bench/programs` (`nrev`, `fib`, `hoabs`, sized to finish on every engine). A run that exits non-zero or exceeds the timeout is recorded as that status, never as a time. Teyjus comes from `TEYJUS_BIN`; it needs OCaml below 5.0. Results are in `tests/bench/results/` (`2026-10-15.json` for 0.3.0, `2026-10-15-optimized.json` and `2026-10-15-rerun.json` after the store rewrite, `2026-10-15-clause-selection.json` after [[changes#optimize-clause-selection]], run without Teyjus) and published in three blog posts: [Compatibility and performance](site/content/blog/compatibility-and-performance.md), [Why LeanElpi was slow](site/content/blog/why-leanelpi-was-slow.md) and [What we took from ELPI](site/content/blog/what-we-took-from-elpi.md). The harness times; it does not compare answers, which is the job of the conformance suites.
 
 - module:: tests/bench
 - depends_on:: [[components#Upstream compatibility suite]]
