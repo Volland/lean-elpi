@@ -114,14 +114,27 @@ partial def applyAt (f : Term) (args : Array Term) (D : Nat) : Term :=
 end
 
 /-- Rename a stored clause/rule term for use at depth `d`: clause variables become the
-given terms and every bound level moves by `d` (the internal binders of a closed term). -/
-partial def renameCVars (vars : Array Term) (d : Nat) : Term → Term
-  | .bound l => .bound (l + d)
-  | .cvar i args => mkApp vars[i]! (args.map (renameCVars vars d))
-  | .app h as => .app (renameCVars vars d h) (as.map (renameCVars vars d))
-  | .lam b => .lam (renameCVars vars d b)
-  | .uvar u as => .uvar u (as.map (renameCVars vars d))
-  | t => t
+given terms and every bound level moves by `d` (the internal binders of a closed term).
+A clause variable bound to a term that lives at depth `d` (not to a unification variable)
+is relocated to the depth of its occurrence, `d` plus the binders crossed. -/
+partial def renameCVars (vars : Array Term) (d : Nat) (t : Term) : Term := go 0 t
+where
+  go (k : Nat) : Term → Term
+    | .bound l => .bound (l + d)
+    | .cvar i args =>
+      let args' := args.map (go k)
+      match vars[i]! with
+      | .uvar u us => if args'.isEmpty then .uvar u us else mkApp (.uvar u us) args'
+      | v =>
+        let v := v.shiftUp d k
+        if args'.isEmpty then v else
+        match v with
+        | .lam _ => applyAt v args' (d + k)
+        | _ => mkApp v args'
+    | .app h as => .app (go k h) (as.map (go k))
+    | .lam b => .lam (go (k + 1) b)
+    | .uvar u as => .uvar u (as.map (go k))
+    | t => t
 
 /-- Instantiate level `d` of a body living at depth `d+1` with `a` (living at depth `d`). -/
 def instantiate (body : Term) (d : Nat) (a : Term) : Term := subst body d a 0
