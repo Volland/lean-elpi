@@ -12,6 +12,9 @@ check() { # file, extracted
 check bindings/python/pyproject.toml "$(sed -n 's/^version = "\(.*\)"/\1/p' bindings/python/pyproject.toml | head -1)"
 check bindings/rust/Cargo.toml "$(sed -n 's/^version = "\(.*\)"/\1/p' bindings/rust/Cargo.toml | head -1)"
 check bindings/node/package.json "$(sed -n 's/.*"version": "\(.*\)".*/\1/p' bindings/node/package.json | head -1)"
+for dep in $(sed -n 's/.*"@lean-elpi\/leanelpi-[a-z0-9-]*": "\(.*\)".*/\1/p' bindings/node/package.json); do
+  check "bindings/node/package.json optionalDependencies" "$dep"
+done
 check Elpi/Ffi.lean "$(sed -n 's/^def version : String := "\(.*\)"/\1/p' Elpi/Ffi.lean)"
 [ $status -eq 0 ] && echo "all versions are $want"
 exit $status

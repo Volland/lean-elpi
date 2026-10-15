@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-15
 
 ### Added
 - Language bindings (`language-bindings` capability): Python (`ctypes`), Node.js (`koffi`, with TypeScript types) and Rust, over a handle-and-string C ABI (`Elpi/Ffi.lean`, `ffi/leanelpi.h`).

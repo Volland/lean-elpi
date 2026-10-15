@@ -9,7 +9,7 @@ dialect of λProlog, the language behind Coq-Elpi. It embeds in Lean as a metapr
 standalone `lean-elpi` binary, and adds an opt-in LF layer with kernel-checked proof
 terms.
 
-**Status:** version 0.2: the engine, constraints, Lean integration, the LF layer and the Lean/ELPI type bridge are implemented. Documentation site and book: https://volland.github.io/lean-elpi/ (sources in `site/`, built into `docs/` with `python3 site/build.py`).
+**Status:** version 0.3: the engine, constraints, Lean integration, the LF layer and the Lean/ELPI type bridge are implemented. Documentation site and book: https://volland.github.io/lean-elpi/ (sources in `site/`, built into `docs/` with `python3 site/build.py`).
 
 ## Use it in your project
 
@@ -17,7 +17,7 @@ Add LeanElpi as a Lake dependency (Lean 4.35.0, no Mathlib needed):
 
 ```lean
 -- lakefile.lean
-require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.2.0"
+require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.3.0"
 ```
 
 or in `lakefile.toml`:
@@ -26,7 +26,7 @@ or in `lakefile.toml`:
 [[require]]
 name = "lean-elpi"
 git = "https://github.com/Volland/lean-elpi"
-rev = "v0.2.0"
+rev = "v0.3.0"
 ```
 
 Then `import Elpi`:

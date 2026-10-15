@@ -95,8 +95,8 @@ twine upload dist/wheels/*.whl            # username: __token__   password: pypi
    `public`, and the workflow passes `--access public`, so nothing extra is needed.
 
 Publishing by hand: `npm login`, then for each tarball in `dist/npm/`:
-`npm publish dist/npm/lean-elpi-leanelpi-darwin-arm64-0.2.0.tgz --access public`, platform packages first,
-`npm publish dist/npm/lean-elpi-leanelpi-0.2.0.tgz --access public` last. Do not publish the loader before
+`npm publish dist/npm/lean-elpi-leanelpi-darwin-arm64-0.3.0.tgz --access public`, platform packages first,
+`npm publish dist/npm/lean-elpi-leanelpi-0.3.0.tgz --access public` last. Do not publish the loader before
 the platform packages exist, or installs resolve a missing optional dependency.
 
 ## 3. crates.io
@@ -132,8 +132,7 @@ the tag claims.
 
 1. Choose the version `X.Y.Z`. Change it in `lakefile.lean`, `Elpi/Ffi.lean` (`version`),
    `bindings/python/pyproject.toml`, `bindings/rust/Cargo.toml`, `bindings/node/package.json`
-   (including the four `optionalDependencies`). `scripts/check-versions.sh` checks all but
-   the `optionalDependencies`, so grep for the old number as well.
+   (including the four `optionalDependencies`). `scripts/check-versions.sh` checks all of them.
 2. Move the `Unreleased` section of `CHANGELOG.md` under the new version.
 3. Commit, then tag and push:
    ```bash

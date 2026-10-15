@@ -1,6 +1,6 @@
 [package]
 name = "leanelpi"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Rust bindings for LeanElpi, the ELPI dialect of λProlog implemented in Lean 4"
 license = "Apache-2.0"
