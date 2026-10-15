@@ -22,9 +22,6 @@ jobs:
         # the conformance self-test runs the real ELPI, so the oracle's opam switch must be active
         run: |
           eval "$(opam env --switch=lean-elpi-oracle)"
-          nproc; free -m; df -h / | tail -1
-          # log memory while the tests run, so a runner that kills the step leaves a trace
-          (while true; do echo "mem: $(free -m | awk 'NR==2{print "used="$3"M free="$4"M avail="$7"M"}') procs=$(pgrep -c lean || true)"; sleep 5; done) &
           lake test
       - name: Bindings (C library, Python, Node.js, Rust)
         run: |
