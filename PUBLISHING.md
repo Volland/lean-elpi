@@ -13,7 +13,7 @@ live in the `@lean-elpi` organisation, which you own, so their names cannot be t
 
 | Registry | Artefact | Notes |
 |---|---|---|
-| PyPI | 4 wheels `leanelpi-X-py3-none-<platform>.whl`, about 44 MB each | one wheel per platform serves every Python 3 version; no source distribution |
+| PyPI | 4 wheels (Linux wheels also carry `libleanshared.so`) `leanelpi-X-py3-none-<platform>.whl`, about 44 MB each | one wheel per platform serves every Python 3 version; no source distribution |
 | npm | `@lean-elpi/leanelpi` (loader, a few KB) and 4 packages `@lean-elpi/leanelpi-<os>-<cpu>` (about 44 MB each) | npm installs only the one matching the machine, through `optionalDependencies` |
 | crates.io | `leanelpi` (26 KB) | the crate does not contain the native library; users download it from the GitHub release |
 | GitHub release | `libleanelpi-<platform>.tar.gz` | the library and header, for Rust and C users |

@@ -332,7 +332,7 @@ The `lean-elpi` executable: upstream-compatible flags (`-exec`, `-test`, `-I`), 
 
 A handle-and-string C interface over the runtime API, so any language with a C FFI can load programs and run queries; answers are JSON text. Source: `Elpi/Ffi.lean`, `ffi/leanelpi.{h,c}`, `scripts/build-ffi.sh`.
 
-Programs live in a handle table inside the Lean runtime, updated atomically, so handles can be used from several threads. The shim starts the runtime, attaches each calling thread to it and turns Lean `IO` results into error strings. `build-ffi.sh` links the engine and the Lean runtime into one shared library. Lean-environment builtins are not reachable through it.
+Programs live in a handle table inside the Lean runtime, updated atomically, so handles can be used from several threads. The shim starts the runtime, attaches each calling thread to it and turns Lean `IO` results into error strings. `build-ffi.sh` links the engine and the Lean runtime into one shared library (macOS) or ships `libleanshared` beside it (Linux). Lean-environment builtins are not reachable through it.
 
 - module:: Elpi.Ffi
 - depends_on:: [[components#Runtime API]]

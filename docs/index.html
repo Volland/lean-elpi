@@ -79,7 +79,7 @@ of (lam F) (arr A B) :- pi x\ of x A =&gt; of (F x) B.</code></pre>
 <div><b>1 Your code</b>Python, Node.js or Rust</div><div class="arrow">→</div>
 <div><b>2 Binding</b><code>ctypes</code>, <code>koffi</code>, <code>extern "C"</code></div><div class="arrow">→</div>
 <div><b>3 libleanelpi</b>seven C functions, program handles, JSON answers</div><div class="arrow">→</div>
-<div><b>4 Engine</b>the ELPI machine and the Lean runtime, in one file</div>
+<div><b>4 Engine</b>the ELPI machine and the Lean runtime, shipped inside the package</div>
 </div>
 <p>Load a program once, add clauses, and run as many queries as you like. Programs are immutable values, so adding a clause never disturbs a program that other threads are using. Install with <code>pip install leanelpi</code> or <code>npm install @lean-elpi/leanelpi</code>; Rust users add the crate and the native library. <a href="/lean-elpi/book/bindings/">Read how it works and see the examples</a>.</p>
 <pre><code>from leanelpi import Program

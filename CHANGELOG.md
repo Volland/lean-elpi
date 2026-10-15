@@ -4,7 +4,7 @@
 
 ### Added
 - Language bindings (`language-bindings` capability): Python (`ctypes`), Node.js (`koffi`, with TypeScript types) and Rust, over a handle-and-string C ABI (`Elpi/Ffi.lean`, `ffi/leanelpi.h`).
-- `scripts/build-ffi.sh`: one self-contained `libleanelpi` with the Lean runtime linked in.
+- `scripts/build-ffi.sh`: `libleanelpi` for macOS (runtime linked in, one file) and Linux (with `libleanshared` beside it).
 - Packaging and release: platform wheels, per-platform npm packages under the `@lean-elpi` scope, the `leanelpi` crate, `scripts/package-*.sh`, `scripts/check-versions.sh`, `.github/workflows/release.yml` and `PUBLISHING.md`.
 - Book chapter "From Python, Node.js and Rust".
 

@@ -26,7 +26,7 @@ Only integers and strings cross the boundary. A program lives inside the Lean ru
 
 Programs are immutable. Adding a clause gives you a new handle and leaves the old program as it was, which is the same persistence the Lean library offers. The handle table is safe to use from several threads.
 
-The native library is a single file. The engine and the Lean runtime are linked together, so a machine needs no Lean installation, only the C and C++ libraries every system has. That is why a wheel is about 44 MB. Starting the runtime takes about a second the first time you load a program in a process.
+A machine needs no Lean installation. On macOS the native library is a single file with the engine and the Lean runtime linked together. On Linux the toolchain's runtime cannot be linked into a shared object, so `libleanelpi.so` comes with `libleanshared.so` beside it and finds it through an `$ORIGIN` rpath; the wheels and npm packages carry both. A wheel is about 44 MB. Starting the runtime takes about a second the first time you load a program in a process.
 
 ### What you get, and what you do not
 
@@ -132,7 +132,7 @@ fn main() -> Result<(), leanelpi::Error> {
 
 `Program` is `Send` and `Sync`, so an `Arc<Program>` can serve queries from many threads at once. Dropping a `Program` frees its handle.
 
-To ship a Rust binary, put `libleanelpi` next to it and link with `-C link-arg=-Wl,-rpath,@executable_path` on macOS or `-Wl,-rpath,$ORIGIN` on Linux (for example from your own `build.rs`).
+To ship a Rust binary, put `libleanelpi` (and, on Linux, the `libleanshared` files from the same archive) next to it and link with `-C link-arg=-Wl,-rpath,@executable_path` on macOS or `-Wl,-rpath,$ORIGIN` on Linux (for example from your own `build.rs`).
 
 ## Other languages
 

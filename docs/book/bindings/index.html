@@ -25,11 +25,11 @@
 <pre><code class="language-json">{&quot;solutions&quot;:[{&quot;bindings&quot;:{&quot;R&quot;:&quot;[1, 2, 3]&quot;},&quot;constraints&quot;:[]}],&quot;exhausted&quot;:true}</code></pre>
 <p><code>exhausted</code> is <code>false</code> when a limit you set stopped the search before the last solution.</p>
 <p>Programs are immutable. Adding a clause gives you a new handle and leaves the old program as it was, which is the same persistence the Lean library offers. The handle table is safe to use from several threads.</p>
-<p>The native library is a single file. The engine and the Lean runtime are linked together, so a machine needs no Lean installation, only the C and C++ libraries every system has. That is why a wheel is about 44 MB. Starting the runtime takes about a second the first time you load a program in a process.</p>
+<p>A machine needs no Lean installation. On macOS the native library is a single file with the engine and the Lean runtime linked together. On Linux the toolchain's runtime cannot be linked into a shared object, so <code>libleanelpi.so</code> comes with <code>libleanshared.so</code> beside it and finds it through an <code>$ORIGIN</code> rpath; the wheels and npm packages carry both. A wheel is about 44 MB. Starting the runtime takes about a second the first time you load a program in a process.</p>
 <h3 id="what-you-get-and-what-you-do-not">What you get, and what you do not</h3>
 <p>You get the engine, the standard library, typed clauses, modes, constraints and CHR. You do not get the Lean-facing builtins (<code>lean.*</code>, <code>{{ … }}</code>, <code>elpi_extern</code>): they need a Lean environment and stay in the Lean host. Values come back as strings, so decode them in your own code.</p>
 <h2 id="install">Install</h2>
-<table><thead><tr><th>Language</th><th>Command</th><th>Notes</th></tr></thead><tbody><tr><td>Python ≥ 3.9</td><td><code>pip install leanelpi</code></td><td>a platform wheel with the library inside</td></tr><tr><td>Node.js ≥ 18</td><td><code>npm install @lean-elpi/leanelpi</code></td><td>npm picks the library for your platform; no compiler needed</td></tr><tr><td>Rust ≥ 1.70</td><td><code>cargo add leanelpi</code></td><td>needs the library separately, see below</td></tr></tbody></table>
+<table><thead><tr><th>Language</th><th>Command</th><th>Notes</th></tr></thead><tbody><tr><td>Python ≥ 3.9</td><td><code>pip install leanelpi</code></td><td>a platform wheel with the library inside (on Linux, with the Lean runtime library beside it)</td></tr><tr><td>Node.js ≥ 18</td><td><code>npm install @lean-elpi/leanelpi</code></td><td>npm picks the library for your platform; no compiler needed</td></tr><tr><td>Rust ≥ 1.70</td><td><code>cargo add leanelpi</code></td><td>needs the library separately, see below</td></tr></tbody></table>
 <p>Supported platforms: macOS (Apple silicon and Intel) and Linux (x86-64 and arm64). Windows is not supported yet.</p>
 <p>To build the library yourself, you need the Lean toolchain (through <code>elan</code>) and a C compiler:</p>
 <pre><code class="language-bash">git clone https://github.com/Volland/lean-elpi &amp;&amp; cd lean-elpi
@@ -97,7 +97,7 @@ fn main() -&gt; Result&lt;(), leanelpi::Error&gt; {
     Ok(())
 }</code></pre>
 <p><code>Program</code> is <code>Send</code> and <code>Sync</code>, so an <code>Arc&lt;Program&gt;</code> can serve queries from many threads at once. Dropping a <code>Program</code> frees its handle.</p>
-<p>To ship a Rust binary, put <code>libleanelpi</code> next to it and link with <code>-C link-arg=-Wl,-rpath,@executable_path</code> on macOS or <code>-Wl,-rpath,$ORIGIN</code> on Linux (for example from your own <code>build.rs</code>).</p>
+<p>To ship a Rust binary, put <code>libleanelpi</code> (and, on Linux, the <code>libleanshared</code> files from the same archive) next to it and link with <code>-C link-arg=-Wl,-rpath,@executable_path</code> on macOS or <code>-Wl,-rpath,$ORIGIN</code> on Linux (for example from your own <code>build.rs</code>).</p>
 <h2 id="other-languages">Other languages</h2>
 <p>Any language with a C FFI can follow the same steps. <code>dist/leanelpi.h</code> documents the functions: call <code>leanelpi_init</code> once, then <code>leanelpi_load</code> for a handle, <code>leanelpi_solve</code> for JSON, and release every returned string with <code>leanelpi_free_string</code>. Errors come back through the <code>err</code> out-parameter.</p>
 <h2 id="when-a-subprocess-is-enough">When a subprocess is enough</h2>
