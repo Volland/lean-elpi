@@ -79,6 +79,12 @@
       "type": "file"
     },
     {
+      "path": "openspec/changes/add-elpi-core/design.md",
+      "accessCount": 2,
+      "lastAccessed": 1791973762002,
+      "type": "file"
+    },
+    {
       "path": "openspec/config.yaml",
       "accessCount": 1,
       "lastAccessed": 1791969369413,
@@ -277,12 +283,6 @@
       "type": "file"
     },
     {
-      "path": "openspec/changes/add-elpi-core/design.md",
-      "accessCount": 1,
-      "lastAccessed": 1791969975761,
-      "type": "file"
-    },
-    {
       "path": "openspec/changes/add-lean-integration/specs/lean-integration/spec.md",
       "accessCount": 1,
       "lastAccessed": 1791969990436,
@@ -322,6 +322,54 @@
       "path": "tests/conformance/selftest.sh",
       "accessCount": 1,
       "lastAccessed": 1791970344577,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Term.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791973889899,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Store.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791973911917,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Unify.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791973983401,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Parser.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791974209034,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Typecheck.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791974357660,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Index.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791974407771,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Builtins.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791974506908,
+      "type": "file"
+    },
+    {
+      "path": "Elpi/Core/Machine.lean",
+      "accessCount": 1,
+      "lastAccessed": 1791974700450,
       "type": "file"
     }
   ],

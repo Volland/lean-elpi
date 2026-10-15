@@ -5,7 +5,7 @@ open System Lake DSL
 package «lean-elpi» where
   testDriver := "Tests"
   version := v!"0.2.0"
-  description := "A native Lean 4 implementation of the ELPI dialect of λProlog: embedded in Lean as commands, tactics and MetaM builtins, with typed Lean/ELPI data interoperability and an LF layer with kernel-checked proofs."
+  description := "λProlog inside Lean 4: write tactics, commands and proof search as logic programs, share types with Lean both ways, and get kernel-checked proofs."
   keywords := #["lambda-prolog", "elpi", "logic-programming", "metaprogramming", "tactics"]
   homepage := "https://volland.github.io/lean-elpi/"
   license := "Apache-2.0"

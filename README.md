@@ -1,7 +1,10 @@
 # LeanElpi
 
-A clean-room, native Lean 4 implementation of the [ELPI](https://github.com/LPCIC/elpi)
-dialect of λProlog. It embeds in Lean as a metaprogramming tool (commands, tactics,
+**λProlog inside Lean 4.** Write tactics, commands and proof search as logic programs, share
+types and functions with Lean in both directions, and get proofs the Lean kernel checks.
+
+LeanElpi is a clean-room, native Lean 4 implementation of the [ELPI](https://github.com/LPCIC/elpi)
+dialect of λProlog, the language behind Coq-Elpi. It embeds in Lean as a metaprogramming tool (commands, tactics,
 `MetaM` builtins), works as a pure library for ordinary Lean programs, ships a
 standalone `lean-elpi` binary, and adds an opt-in LF layer with kernel-checked proof
 terms.
