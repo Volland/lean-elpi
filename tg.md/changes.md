@@ -53,3 +53,12 @@ Depends on [[changes#add-lean-integration]]. Capability: `lean-interop`; it also
 
 - status:: implemented
 - milestone:: Interop
+
+## add-language-bindings
+
+The C ABI, one self-contained native library, Python, Node.js and Rust bindings, and their release to PyPI, npm and crates.io.
+
+Depends on [[changes#add-elpi-core]]. Capability: `language-bindings`. Files: `openspec/changes/add-language-bindings/`; the release routine is `PUBLISHING.md`.
+
+- status:: implemented
+- milestone:: Bindings

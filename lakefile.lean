@@ -28,6 +28,12 @@ lean_lib Tests where
   root := `Elpi.Cli.Main
   supportInterpreter := true
 
+/-- The Lean side of the C ABI behind the Python and Rust bindings; `scripts/build-ffi.sh`
+links it with `ffi/leanelpi.c` into one shared library. -/
+lean_lib ElpiFfi where
+  roots := #[`Elpi.Ffi]
+  needs := #[`@/«lean-elpi»]
+
 /-- Differential conformance run against the ELPI 1.18 oracle (`lake build` first). -/
 script conformance (args) do
   let child ← IO.Process.spawn { cmd := "bash", args := #["tests/conformance/run.sh"] ++ args.toArray }

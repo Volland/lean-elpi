@@ -1,0 +1,17 @@
+[package]
+name = "leanelpi"
+version = "0.2.0"
+edition = "2021"
+description = "Rust bindings for LeanElpi, the ELPI dialect of λProlog implemented in Lean 4"
+license = "Apache-2.0"
+repository = "https://github.com/Volland/lean-elpi"
+readme = "README.md"
+keywords = ["lambda-prolog", "elpi", "logic-programming", "lean4", "prolog"]
+categories = ["api-bindings", "compilers"]
+rust-version = "1.70"
+build = "build.rs"
+include = ["src/**", "tests/**", "build.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -60,16 +60,32 @@ of (lam F) (arr A B) :- pi x\ of x A =&gt; of (F x) B.</code></pre>
 </section>
 
 <section>
-<h2>Three ways to use it</h2>
+<h2>Ways to use it</h2>
 <table>
 <thead><tr><th>Mode</th><th>You write</th><th>You get</th></tr></thead>
 <tbody>
 <tr><td>Standalone</td><td><code>lean-elpi program.elpi -test</code></td><td>A λProlog interpreter and REPL</td></tr>
 <tr><td>Library</td><td><code>Program.load</code>, <code>solve</code></td><td>Logic queries from ordinary Lean code</td></tr>
 <tr><td>Inside Lean</td><td><code>elpi_program</code>, <code>#elpi</code>, <code>elpi_tactic</code></td><td>Tactics and commands written in λProlog</td></tr>
+<tr><td>Python, Node.js, Rust</td><td><code>pip install leanelpi</code>, <code>npm install @lean-elpi/leanelpi</code></td><td>Load a program once and query it from your own application</td></tr>
 <tr><td>LF layer</td><td><code>lf_signature</code>, <code>lf_certify</code></td><td>Proof search whose results the kernel checks</td></tr>
 </tbody>
 </table>
+</section>
+
+<section>
+<h2>From your own application</h2>
+<div class="flow">
+<div><b>1 Your code</b>Python, Node.js or Rust</div><div class="arrow">→</div>
+<div><b>2 Binding</b><code>ctypes</code>, <code>koffi</code>, <code>extern "C"</code></div><div class="arrow">→</div>
+<div><b>3 libleanelpi</b>seven C functions, program handles, JSON answers</div><div class="arrow">→</div>
+<div><b>4 Engine</b>the ELPI machine and the Lean runtime, in one file</div>
+</div>
+<p>Load a program once, add clauses, and run as many queries as you like. Programs are immutable values, so adding a clause never disturbs a program that other threads are using. Install with <code>pip install leanelpi</code> or <code>npm install @lean-elpi/leanelpi</code>; Rust users add the crate and the native library. <a href="/lean-elpi/book/bindings/">Read how it works and see the examples</a>.</p>
+<pre><code>from leanelpi import Program
+
+p = Program("pred n o:int.\nn 1.\nn 2.")
+[s["X"] for s in p.solve("n X")]     # ['1', '2']</code></pre>
 </section>
 
 <section>

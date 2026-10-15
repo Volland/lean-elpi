@@ -20,6 +20,15 @@ jobs:
         run: scripts/check-core-imports.sh
       - name: Tests
         run: lake test
+      - name: Bindings (C library, Python, Node.js, Rust)
+        run: |
+          scripts/check-versions.sh
+          scripts/build-ffi.sh
+          scripts/check-ffi-deps.sh
+          python3 -m pip install pytest
+          (cd bindings/python && python3 -m pytest)
+          (cd bindings/node && npm install && npm test)
+          (cd bindings/rust && cargo test)
       - name: Differential conformance against the oracle
         run: |
           eval "$(opam env --switch=lean-elpi-oracle)"

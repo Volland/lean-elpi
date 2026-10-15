@@ -1,0 +1,22 @@
+{
+  "name": "@lean-elpi/leanelpi",
+  "version": "0.2.0",
+  "description": "Node.js bindings for LeanElpi, the ELPI dialect of λProlog implemented in Lean 4",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts", "README.md", "LICENSE"],
+  "scripts": { "test": "node --test test/" },
+  "keywords": ["lambda-prolog", "elpi", "logic-programming", "lean4", "prolog"],
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "git+https://github.com/Volland/lean-elpi.git", "directory": "bindings/node" },
+  "publishConfig": { "access": "public" },
+  "homepage": "https://volland.github.io/lean-elpi/",
+  "engines": { "node": ">=18" },
+  "dependencies": { "koffi": "^2.9.0" },
+  "optionalDependencies": {
+    "@lean-elpi/leanelpi-darwin-arm64": "0.2.0",
+    "@lean-elpi/leanelpi-darwin-x64": "0.2.0",
+    "@lean-elpi/leanelpi-linux-arm64": "0.2.0",
+    "@lean-elpi/leanelpi-linux-x64": "0.2.0"
+  }
+}

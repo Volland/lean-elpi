@@ -49,11 +49,29 @@ elpi_program demo
 #elpi demo lp%{ twice 21 X }%     -- X = 42
 ```
 
+## From Python, Node.js and Rust
+
+One native library serves three bindings: load a program once, extend it, query it many times.
+
+```bash
+pip install leanelpi        # Python
+npm install @lean-elpi/leanelpi   # Node.js
+cargo add leanelpi          # Rust (needs the native library, see the guide)
+```
+
+```python
+from leanelpi import Program
+Program("pred n o:int.\nn 1.\nn 2.").solve("n X")   # two solutions: X = 1, X = 2
+```
+
+macOS and Linux, no Lean installation needed. Guide: [From Python, Node.js and Rust](https://volland.github.io/lean-elpi/book/bindings/); release steps: [PUBLISHING.md](PUBLISHING.md).
+
 ## What it does
 
 - **ELPI engine in Lean**: typed clauses, `pi`/`=>`, higher-order pattern unification, modes, constraints and CHR, a command-line tool, and a lazy library API.
 - **Lean integration**: `{{ … }}` quotations, tactics and commands written in λProlog, `lean.*` builtins over `MetaM`, a typed rule DSL.
 - **Type bridge** (new in 0.2): `deriving Elpi` for parametric and recursive types, `elpi_data` (ELPI types to Lean inductives), `elpi_extern` (typed Lean functions as ELPI predicates), `lean.env.indt` / `lean.add_inductive` (read and create inductive types from ELPI).
+- **Bindings**: Python, Node.js and Rust packages over a C interface, with the Lean runtime inside one shared library.
 - **LF layer**: dependently typed signatures, recorded proof terms, export to Lean inductives, kernel-checked certificates.
 
 See [CHANGELOG.md](CHANGELOG.md) for releases and [CONTRIBUTING.md](CONTRIBUTING.md) to help.

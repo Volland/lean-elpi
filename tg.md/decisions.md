@@ -3,7 +3,7 @@ type: Decision
 status: accepted  # per section: see each status:: line
 date: 2026-10-14
 owner: Volodymyr Pavlyshyn
-openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop, language-bindings]
 ---
 # Decisions
 
@@ -315,3 +315,17 @@ Plain data types are declared once, on either side, and the other side is genera
 - motivated_by:: [[decisions#Plain types with reflected Lean terms]]
 - motivated_by:: [[constraints#CIC unification is undecidable]]
 - introduced_by:: [[changes#add-lean-interop]]
+
+## Handle-and-string C ABI
+
+Other languages reach the engine through a C interface in which programs are numeric handles and every other value is a UTF-8 string, with query answers as JSON.
+
+**Context.** Python, Node.js and Rust programs should load a program once and query it many times, and install it with `pip`, `npm` or `cargo` on a machine without Lean. Exposing `lean_object*` would make each binding manage Lean reference counts.
+
+**Decision.** `Elpi/Ffi.lean` keeps programs in a handle table inside the Lean runtime and exports seven C functions. `scripts/build-ffi.sh` links the engine and the Lean runtime into one shared library that depends only on system libraries. Python uses `ctypes`, Node.js uses `koffi`, Rust links the library; none needs a compiler on the user's machine except Rust's own.
+
+**Consequences.** Each binding is a few hundred lines and needs only a JSON parser. Lean-environment builtins (`lean.*`, `elpi_extern`) are unreachable through it, and values are strings. The library is about 150 MB (44 MB compressed), because every `Lean` module is linked in, and starts in about a second. The handle table is updated atomically; a first version that read and wrote it separately gave two threads the same handle, which the Rust concurrency test caught.
+
+- status:: accepted
+- motivated_by:: [[decisions#Monad-generic core and packaging]]
+- introduced_by:: [[changes#add-language-bindings]]

@@ -1,6 +1,6 @@
 ---
 type: Component
-openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop, language-bindings]
 ---
 # Components
 
@@ -327,6 +327,28 @@ The `lean-elpi` executable: upstream-compatible flags (`-exec`, `-test`, `-I`), 
 - depends_on:: [[components#Library resolver]]
 - motivated_by:: [[decisions#Monad-generic core and packaging]]
 - introduced_by:: [[changes#add-elpi-core]]
+
+## C ABI
+
+A handle-and-string C interface over the runtime API, so any language with a C FFI can load programs and run queries; answers are JSON text. Source: `Elpi/Ffi.lean`, `ffi/leanelpi.{h,c}`, `scripts/build-ffi.sh`.
+
+Programs live in a handle table inside the Lean runtime, updated atomically, so handles can be used from several threads. The shim starts the runtime, attaches each calling thread to it and turns Lean `IO` results into error strings. `build-ffi.sh` links the engine and the Lean runtime into one shared library. Lean-environment builtins are not reachable through it.
+
+- module:: Elpi.Ffi
+- depends_on:: [[components#Runtime API]]
+- motivated_by:: [[decisions#Handle-and-string C ABI]]
+- introduced_by:: [[changes#add-language-bindings]]
+
+## Language bindings
+
+Python (`ctypes`), Node.js (`koffi`) and Rust packages over the C ABI, in `bindings/`, released together from one version tag by `.github/workflows/release.yml`.
+
+Each is a thin wrapper: a `Program` class with `first`, `solve`, `ask` and persistent `assert`. Distribution is the hard part: platform wheels, per-platform npm packages with a loader, and a crate that links a library fetched separately. Versions are kept equal by `scripts/check-versions.sh`; the release steps are in `PUBLISHING.md`.
+
+- module:: bindings
+- depends_on:: [[components#C ABI]]
+- motivated_by:: [[decisions#Handle-and-string C ABI]]
+- introduced_by:: [[changes#add-language-bindings]]
 
 ## Conformance harness
 

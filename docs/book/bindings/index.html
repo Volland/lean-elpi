@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From Python, Node.js and Rust · LeanElpi</title>
+<meta name="description" content="Load ELPI programs and run queries from Python, Node.js or Rust through one native library. How it works, how to install it, how to use it.">
+<link rel="stylesheet" href="/lean-elpi/assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/lean-elpi/">Lean<span>Elpi</span></a>
+<nav><a href="/lean-elpi/">Home</a><a href="/lean-elpi/book/" aria-current=page>Book</a><a href="/lean-elpi/blog/">Blog</a><a href="https://github.com/Volland/lean-elpi">GitHub</a></nav>
+</div></header>
+<main class="wrap prose">
+<aside class="toc"><strong>The book</strong><ol><li><a href="/lean-elpi/book/why-lambda-prolog/">Why λProlog</a></li><li><a href="/lean-elpi/book/getting-started/">Getting started</a></li><li><a href="/lean-elpi/book/first-programs/">Terms, clauses and search</a></li><li><a href="/lean-elpi/book/higher-order/">Higher-order programming</a></li><li><a href="/lean-elpi/book/types-and-modes/">Types and modes</a></li><li><a href="/lean-elpi/book/constraints/">Constraints and CHR</a></li><li><a href="/lean-elpi/book/standalone/">Using it standalone</a></li><li><a href="/lean-elpi/book/inside-lean/">Using it inside Lean</a></li><li><a href="/lean-elpi/book/interop/">Sharing types between Lean and λProlog</a></li><li><a href="/lean-elpi/book/lf/">Certified proof search with LF</a></li><li><a href="/lean-elpi/book/neuro-symbolic/">Higher-order logic and neuro-symbolic systems</a></li><li><a href="/lean-elpi/book/bindings/" aria-current=page>From Python, Node.js and Rust</a></li></ol></aside>
+<article><h1 id="from-python-node-js-and-rust">From Python, Node.js and Rust</h1>
+<p>LeanElpi is written in Lean, but programs written in other languages can load an ELPI program once, add clauses to it and query it many times. Three bindings do this: <code>pip install leanelpi</code>, <code>npm install @lean-elpi/leanelpi</code> and the <code>leanelpi</code> crate. All three sit on one native library.</p>
+<h2 id="how-it-works">How it works</h2>
+<pre><code> your code ──► binding ──► libleanelpi (C interface) ──► ELPI engine in Lean
+ Python        ctypes        7 functions, handles          + Lean runtime,
+ Node.js       koffi         and strings                   in one file
+ Rust          extern &quot;C&quot;</code></pre>
+<p>Only integers and strings cross the boundary. A program lives inside the Lean runtime and your code holds a numeric <em>handle</em> to it. Loading, asserting a clause and running a query are calls on that handle. A query returns JSON text with one object per solution: the query variables with their values as ELPI prints them, and any constraints still suspended.</p>
+<pre><code class="language-json">{&quot;solutions&quot;:[{&quot;bindings&quot;:{&quot;R&quot;:&quot;[1, 2, 3]&quot;},&quot;constraints&quot;:[]}],&quot;exhausted&quot;:true}</code></pre>
+<p><code>exhausted</code> is <code>false</code> when a limit you set stopped the search before the last solution.</p>
+<p>Programs are immutable. Adding a clause gives you a new handle and leaves the old program as it was, which is the same persistence the Lean library offers. The handle table is safe to use from several threads.</p>
+<p>The native library is a single file. The engine and the Lean runtime are linked together, so a machine needs no Lean installation, only the C and C++ libraries every system has. That is why a wheel is about 44 MB. Starting the runtime takes about a second the first time you load a program in a process.</p>
+<h3 id="what-you-get-and-what-you-do-not">What you get, and what you do not</h3>
+<p>You get the engine, the standard library, typed clauses, modes, constraints and CHR. You do not get the Lean-facing builtins (<code>lean.*</code>, <code>{{ … }}</code>, <code>elpi_extern</code>): they need a Lean environment and stay in the Lean host. Values come back as strings, so decode them in your own code.</p>
+<h2 id="install">Install</h2>
+<table><thead><tr><th>Language</th><th>Command</th><th>Notes</th></tr></thead><tbody><tr><td>Python ≥ 3.9</td><td><code>pip install leanelpi</code></td><td>a platform wheel with the library inside</td></tr><tr><td>Node.js ≥ 18</td><td><code>npm install @lean-elpi/leanelpi</code></td><td>npm picks the library for your platform; no compiler needed</td></tr><tr><td>Rust ≥ 1.70</td><td><code>cargo add leanelpi</code></td><td>needs the library separately, see below</td></tr></tbody></table>
+<p>Supported platforms: macOS (Apple silicon and Intel) and Linux (x86-64 and arm64). Windows is not supported yet.</p>
+<p>To build the library yourself, you need the Lean toolchain (through <code>elan</code>) and a C compiler:</p>
+<pre><code class="language-bash">git clone https://github.com/Volland/lean-elpi &amp;&amp; cd lean-elpi
+scripts/build-ffi.sh          # writes dist/libleanelpi.dylib or .so, and dist/leanelpi.h</code></pre>
+<h2 id="python">Python</h2>
+<pre><code class="language-python">from leanelpi import Program
+
+p = Program(&quot;&quot;&quot;
+pred app i:list int, i:list int, o:list int.
+app [] L L.
+app [X|Xs] L [X|R] :- app Xs L R.
+&quot;&quot;&quot;)
+
+p.first(&quot;app [1,2] [3] R&quot;)            # {&#x27;R&#x27;: &#x27;[1, 2, 3]&#x27;}
+p.ask(&quot;app [1] [2] [1,2]&quot;)            # True
+for s in p.solve(&quot;app X Y [1,2]&quot;):    # every split of [1,2]
+    print(s[&quot;X&quot;], s[&quot;Y&quot;])
+
+p2 = p.assert_clause(&quot;app [] [] [].&quot;)  # a new program; p is unchanged
+sols, done = p.solve_all(&quot;app X Y [1,2]&quot;, limit=2)   # done is False: the limit cut it short</code></pre>
+<p>Failure is an empty result, not an exception. Parse errors, type errors and running out of fuel raise <code>leanelpi.ElpiError</code>. A <code>Program</code> frees its handle when it is garbage collected, or earlier with <code>close()</code> or a <code>with</code> block. Pass <code>fuel=</code> to bound the number of resolution steps.</p>
+<h2 id="node-js">Node.js</h2>
+<pre><code class="language-js">const { Program, ElpiError } = require(&#x27;@lean-elpi/leanelpi&#x27;);
+
+const p = new Program(`
+pred app i:list int, i:list int, o:list int.
+app [] L L.
+app [X|Xs] L [X|R] :- app Xs L R.
+`);
+
+p.first(&#x27;app [1,2] [3] R&#x27;);                  // { R: &#x27;[1, 2, 3]&#x27; }
+p.ask(&#x27;app [1] [2] [1,2]&#x27;);                  // true
+for (const s of p.solve(&#x27;app X Y [1,2]&#x27;)) console.log(s.bindings.X, s.bindings.Y);
+
+const p2 = p.assertClause(&#x27;app [] [] [].&#x27;);  // a new program; p is unchanged
+const { solutions, exhausted } = p.solveAll(&#x27;app X Y [1,2]&#x27;, { limit: 2 });
+
+try { new Program(&#x27;pred q o:int.\nq foo bar.&#x27;); }
+catch (e) { if (e instanceof ElpiError) console.error(e.message); }</code></pre>
+<p>TypeScript declarations ship with the package. Calls are synchronous: a long search blocks the event loop, so run heavy queries in a worker thread and bound them with <code>fuel</code>. <code>close()</code> frees a program early; otherwise it is freed when garbage collected.</p>
+<h2 id="rust">Rust</h2>
+<p>Add the crate and point its build script at the native library:</p>
+<pre><code class="language-bash">export LEANELPI_DIST=/path/to/directory/with/libleanelpi    # from the GitHub release, or dist/
+cargo add leanelpi</code></pre>
+<p>The crate is small because crates.io limits crates to 10 MB; the library is not inside it. Download <code>libleanelpi-&lt;platform&gt;.tar.gz</code> from the <a href="https://github.com/Volland/lean-elpi/releases">GitHub release</a> and unpack it, or build it as above. The build script links the library and adds an rpath, so <code>cargo run</code> and <code>cargo test</code> find it.</p>
+<pre><code class="language-rust">use leanelpi::Program;
+
+fn main() -&gt; Result&lt;(), leanelpi::Error&gt; {
+    let p = Program::new(
+        &quot;pred app i:list int, i:list int, o:list int.\n\
+         app [] L L.\n\
+         app [X|Xs] L [X|R] :- app Xs L R.&quot;,
+    )?;
+
+    let s = p.first(&quot;app [1,2] [3] R&quot;)?.expect(&quot;a solution&quot;);
+    assert_eq!(s.bindings[&quot;R&quot;], &quot;[1, 2, 3]&quot;);
+
+    for s in p.solve(&quot;app X Y [1,2]&quot;)? {
+        println!(&quot;{} {}&quot;, s.bindings[&quot;X&quot;], s.bindings[&quot;Y&quot;]);
+    }
+
+    let p2 = p.assert_clause(&quot;app [] [] [].&quot;)?;    // p is unchanged
+    let (some, exhausted) = p2.solve_with(&quot;app X Y [1,2]&quot;, Some(2), None)?;
+    println!(&quot;{} solutions, exhausted: {exhausted}&quot;, some.len());
+    Ok(())
+}</code></pre>
+<p><code>Program</code> is <code>Send</code> and <code>Sync</code>, so an <code>Arc&lt;Program&gt;</code> can serve queries from many threads at once. Dropping a <code>Program</code> frees its handle.</p>
+<p>To ship a Rust binary, put <code>libleanelpi</code> next to it and link with <code>-C link-arg=-Wl,-rpath,@executable_path</code> on macOS or <code>-Wl,-rpath,$ORIGIN</code> on Linux (for example from your own <code>build.rs</code>).</p>
+<h2 id="other-languages">Other languages</h2>
+<p>Any language with a C FFI can follow the same steps. <code>dist/leanelpi.h</code> documents the functions: call <code>leanelpi_init</code> once, then <code>leanelpi_load</code> for a handle, <code>leanelpi_solve</code> for JSON, and release every returned string with <code>leanelpi_free_string</code>. Errors come back through the <code>err</code> out-parameter.</p>
+<h2 id="when-a-subprocess-is-enough">When a subprocess is enough</h2>
+<p>If you only run a file and read the output, call the <code>lean-elpi</code> executable (see <em>Using it standalone</em>) and skip the library. The library is the better choice when you call the engine often, keep a program in memory, or add clauses between queries.</p>
+<h2 id="publishing-your-own-build">Publishing your own build</h2>
+<p>The release procedure, account setup for PyPI, npm and crates.io, and the CI workflow are described in <code>PUBLISHING.md</code> in the repository.</p></article><nav class="pager"><a href="/lean-elpi/book/neuro-symbolic/">← Higher-order logic and neuro-symbolic systems</a><span></span></nav>
+</main>
+<footer><div class="wrap">
+<p>LeanElpi is open source under the <a href="https://github.com/Volland/lean-elpi/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+<p><a href="/lean-elpi/impressum/">Impressum</a> · <a href="/lean-elpi/datenschutz/">Datenschutz</a> · <a href="/lean-elpi/agb/">AGB</a></p>
+</div></footer>
+</body>
+</html>
