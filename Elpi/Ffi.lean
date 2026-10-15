@@ -79,6 +79,6 @@ def solve (h : UInt64) (query : String) (limit : UInt64) (fuel : UInt64) : IO St
 
 /-- The library version, for binding-side compatibility checks. -/
 @[export leanelpi_ffi_version]
-def version : String := "0.3.1"
+def version : String := "0.3.2"
 
 end Elpi.Ffi

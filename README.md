@@ -17,7 +17,7 @@ Add LeanElpi as a Lake dependency (Lean 4.35.0, no Mathlib needed):
 
 ```lean
 -- lakefile.lean
-require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.3.1"
+require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.3.2"
 ```
 
 or in `lakefile.toml`:
@@ -26,7 +26,7 @@ or in `lakefile.toml`:
 [[require]]
 name = "lean-elpi"
 git = "https://github.com/Volland/lean-elpi"
-rev = "v0.3.1"
+rev = "v0.3.2"
 ```
 
 Then `import Elpi`:
@@ -76,7 +76,7 @@ macOS and Linux, no Lean installation needed. Guide: [From Python, Node.js and R
 
 ## Performance and compatibility
 
-Measured against ELPI 1.18 on ELPI's own performance programs (`tests/bench`), the current engine is about 1.9 times slower by geometric mean (1.1 to 4.6 times, 50 to 200 MB of memory), and faster on start-up and `ackermann`; release 0.3.1 was 2.4 times slower and 0.3.0 was 31 times slower. It passes 43 of the 114 upstream ELPI tests that apply and 38 of 40 corpus programs, and 11 of the 21 performance programs are still rejected by the parser, type checker or a missing builtin. Details, the known failures and how to reproduce: the blog posts [compatibility and performance](https://volland.github.io/lean-elpi/blog/compatibility-and-performance/) [why it was slow](https://volland.github.io/lean-elpi/blog/why-leanelpi-was-slow/) and [what we took from ELPI's runtime](https://volland.github.io/lean-elpi/blog/what-we-took-from-elpi/).
+Measured against ELPI 1.18 on ELPI's own performance programs (`tests/bench`), release 0.3.2 is about 1.9 times slower by geometric mean (1.1 to 4.6 times, 50 to 200 MB of memory), and faster on start-up and `ackermann`; release 0.3.1 was 2.4 times slower and 0.3.0 was 31 times slower. It passes 43 of the 114 upstream ELPI tests that apply and 38 of 40 corpus programs, and 11 of the 21 performance programs are still rejected by the parser, type checker or a missing builtin. Details, the known failures and how to reproduce: the blog posts [compatibility and performance](https://volland.github.io/lean-elpi/blog/compatibility-and-performance/) [why it was slow](https://volland.github.io/lean-elpi/blog/why-leanelpi-was-slow/) and [what we took from ELPI's runtime](https://volland.github.io/lean-elpi/blog/what-we-took-from-elpi/).
 
 See [CHANGELOG.md](CHANGELOG.md) for releases and [CONTRIBUTING.md](CONTRIBUTING.md) to help.
 

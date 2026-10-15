@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.2 — 2026-10-15
 
 ### Changed
 - Engine speed (OpenSpec change `optimize-clause-selection`): clauses are compiled at load time (head argument array, flat body goals); each first-argument key keeps a ready candidate array; hypotheses are indexed by predicate and key; dereferencing relocates and β-reduces a λ-term in one pass (`Term.applyAtFrom`); clause instantiation keeps ground subterms shared; head matching and the unifier allocate one record per step. On ELPI's performance programs the geometric-mean slowdown against ELPI went from 2.4 to 1.9 times and the worst case (`lambda3`) from 10.5 to 4.6. Conformance results are unchanged.
