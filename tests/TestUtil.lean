@@ -81,6 +81,11 @@ unsafe def enableInitUnsafe : IO Unit := Lean.enableInitializersExecution
 
 @[implemented_by enableInitUnsafe] opaque enableInit : IO Unit
 
+/-- `Environment.freeRegions` is `unsafe` (the environment must not be used afterwards). -/
+unsafe def freeEnvUnsafe (env : Lean.Environment) : IO Unit := env.freeRegions
+
+@[implemented_by freeEnvUnsafe] opaque freeEnv (env : Lean.Environment) : IO Unit
+
 /-- Elaborate Lean source text (with its `import` header) and return the messages with their
 positions: `(severity, line, column, text)`. -/
 def elabSource (src : String) (fileName : String := "<test>") :
@@ -95,6 +100,10 @@ def elabSource (src : String) (fileName : String := "<test>") :
   let mut out := []
   for m in s.commandState.messages.toList do
     out := out ++ [(m.severity, m.pos.line, m.pos.column, ← m.data.toString)]
+  -- Release the imported .olean regions: every call imports `Lean` and `Elpi` afresh, and without
+  -- this each one keeps about 2 GB mapped for the life of the process (a test with a dozen
+  -- calls then needs more memory than a hosted CI runner has).
+  freeEnv s.commandState.env
   return out
 
 end TestUtil
