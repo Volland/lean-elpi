@@ -30,6 +30,8 @@ Median wall time of three runs, in seconds, on the same Apple M2 Max, with the s
 
 On the eight programs both versions could finish, the geometric-mean slowdown went from **31× to 3.1×**. Over all eleven programs where both engines finish now, it is 2.9×, and the worst case is 10.7×. Teyjus, the other λProlog system, is between 0.4 and 2.8 times ELPI's time on its six programs, so LeanElpi is now about 2 to 3.4 times Teyjus's time on the programs they share.
 
+A second full run on the same build gave the same ratios to within 0.1 (geometric mean 3.0, worst case 10.5), with every engine about 10% faster in absolute time, so the ratios are the stable part. Both result files are in the repository.
+
 Peak memory moved more:
 
 | Program | ELPI | LeanElpi before | LeanElpi now |
@@ -110,4 +112,4 @@ tests/conformance/run.sh && tests/upstream/run.sh lean # compatibility is unchan
 lake test                                              # includes tests/Core/Scaling.lean
 ```
 
-The raw results are in `tests/bench/results/`: `2026-10-15.json` for 0.3.0 and `2026-10-15-optimized.json` for this tree. Issues and faster ideas are welcome on [GitHub](https://github.com/Volland/lean-elpi/issues).
+The raw results are in `tests/bench/results/`: `2026-10-15.json` for 0.3.0 and `2026-10-15-optimized.json` and `2026-10-15-rerun.json` for this tree. Issues and faster ideas are welcome on [GitHub](https://github.com/Volland/lean-elpi/issues).
