@@ -382,7 +382,7 @@ Beyond CHR written in ELPI, the [[decisions#Tiered solver API]] lets Lean code p
 
 ## Performance expectations
 
-Expected 3 to 10 times slower than OCaml ELPI; measured 4 to 142 times on 0.3.0, 1.1 to 10.5 (2.4 by geometric mean) after the store rewrite, and 1.1 to 4.6 (1.9) now ([[components#Benchmark harness]]).
+Expected 3 to 10 times slower than OCaml ELPI; measured 4 to 142 times on 0.3.0, 1.1 to 10.5 after the store rewrite, and 0.3 to 6.2 (2.4 by geometric mean) now, over all of ELPI's performance programs ([[components#Benchmark harness]]).
 
 On 0.3.0 some programs also ran out of memory; the engine now uses tens to hundreds of megabytes.
 
