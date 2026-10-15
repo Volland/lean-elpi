@@ -383,6 +383,112 @@ def rexMatch (pat str : String) : Bool :=
   let (r, _) := parseRx pat.toList.toArray 0
   rxMatch r str.toList.toArray 0 (fun j => j == str.length)
 
+/-! ### Integer-keyed maps in Lean
+
+`std.int.map` and `std.int.set` are the standard library's AVL trees (`std.map.node L K V R H`
+and `std.map.leaf`) with integer keys. Their insert, find and remove run here, on the same
+terms, because interpreting the balancing costs a few hundred resolution steps per key. The
+trees are the ones the ELPI-source code in `std.elpi` builds and reads, so the two interoperate. -/
+
+namespace IntAvl
+
+/-- The two constructors of a tree and the context to read terms in. -/
+structure Env where
+  c : BCtx
+  leaf : ConstId
+  node : ConstId
+
+def Env.view (e : Env) (t : Term) : Option (Term × Term × Term × Term) :=
+  match e.c.store.deref t e.c.depth with
+  | .app (.const n) #[l, k, v, r, _] => if n == e.node then some (l, k, v, r) else none
+  | _ => none
+
+def Env.ht (e : Env) (t : Term) : Int :=
+  match e.c.store.deref t e.c.depth with
+  | .app (.const n) #[_, _, _, _, h] =>
+    if n == e.node then
+      (match e.c.store.deref h e.c.depth with | .lit (.int i) => i | _ => 0)
+    else 0
+  | _ => 0
+
+def Env.key (e : Env) (t : Term) : Option Int :=
+  match e.c.store.deref t e.c.depth with | .lit (.int i) => some i | _ => none
+
+def Env.mkNode (e : Env) (l k v r : Term) : Term :=
+  .app (.const e.node) #[l, k, v, r, .lit (.int (max (e.ht l) (e.ht r) + 1))]
+
+/-- A node over two subtrees whose heights differ by at most two, rebalanced. -/
+def Env.bal (e : Env) (l k v r : Term) : Term :=
+  let hl := e.ht l
+  let hr := e.ht r
+  if hl - hr > 1 then
+    match e.view l with
+    | some (ll, lk, lv, lr) =>
+      if e.ht ll ≥ e.ht lr then e.mkNode ll lk lv (e.mkNode lr k v r)
+      else
+        match e.view lr with
+        | some (lrl, lrk, lrv, lrr) => e.mkNode (e.mkNode ll lk lv lrl) lrk lrv (e.mkNode lrr k v r)
+        | none => e.mkNode l k v r
+    | none => e.mkNode l k v r
+  else if hr - hl > 1 then
+    match e.view r with
+    | some (rl, rk, rv, rr) =>
+      if e.ht rr ≥ e.ht rl then e.mkNode (e.mkNode l k v rl) rk rv rr
+      else
+        match e.view rl with
+        | some (rll, rlk, rlv, rlr) => e.mkNode (e.mkNode l k v rll) rlk rlv (e.mkNode rlr rk rv rr)
+        | none => e.mkNode l k v r
+    | none => e.mkNode l k v r
+  else e.mkNode l k v r
+
+partial def Env.add (e : Env) (kt : Term) (k : Int) (v : Term) (t : Term) : Term :=
+  match e.view t with
+  | none => e.mkNode (.const e.leaf) kt v (.const e.leaf)
+  | some (l, k1, v1, r) =>
+    match e.key k1 with
+    | some k1i =>
+      if k < k1i then e.bal (e.add kt k v l) k1 v1 r
+      else if k1i < k then e.bal l k1 v1 (e.add kt k v r)
+      else e.mkNode l kt v r
+    | none => t
+
+partial def Env.find (e : Env) (k : Int) (t : Term) : Option Term :=
+  match e.view t with
+  | none => none
+  | some (l, k1, v1, r) =>
+    match e.key k1 with
+    | some k1i => if k < k1i then e.find k l else if k1i < k then e.find k r else some v1
+    | none => none
+
+/-- The smallest binding of a non-empty tree and the tree without it. -/
+partial def Env.popMin (e : Env) (t : Term) : Option (Term × Term × Term) :=
+  match e.view t with
+  | none => none
+  | some (l, k, v, r) =>
+    match e.view l with
+    | none => some (k, v, r)
+    | some _ => (e.popMin l).map fun (mkey, mv, l') => (mkey, mv, e.bal l' k v r)
+
+partial def Env.remove (e : Env) (k : Int) (t : Term) : Term :=
+  match e.view t with
+  | none => t
+  | some (l, k1, v1, r) =>
+    match e.key k1 with
+    | some k1i =>
+      if k < k1i then e.bal (e.remove k l) k1 v1 r
+      else if k1i < k then e.bal l k1 v1 (e.remove k r)
+      else
+        match e.view l, e.view r with
+        | none, _ => r
+        | _, none => l
+        | _, _ =>
+          match e.popMin r with
+          | some (mkey, mv, r') => e.bal l mkey mv r'
+          | none => l
+    | none => t
+
+end IntAvl
+
 /-- The core builtin table. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Core builtins]]
 def core (m : Type → Type) [Monad m] [Output m] : List (Builtin m) :=
@@ -424,6 +530,38 @@ def core (m : Type → Type) [Monad m] [Output m] : List (Builtin m) :=
         let ps : Print.PS := { syms := c.syms, store := c.store }
         let (s, ps') := (Print.pp args[0]! c.depth 0 true).run ps
         .alts ps'.store (.cons #[args[0]!, .lit (.str s)] (Thunk.mk fun _ => .nil)) },
+    -- integer-keyed balanced trees (see `IntAvl`)
+    { sig := sig "std.int.private.add" [.i, .i, .i, .o]
+      run := fun c args => pure' <|
+        match c.syms.find? "std.map.leaf", c.syms.find? "std.map.node" with
+        | some leaf, some node =>
+          let e : IntAvl.Env := { c, leaf, node }
+          let kt := c.store.deref args[0]! c.depth
+          match e.key kt with
+          | some k => one c #[args[0]!, args[1]!, args[2]!, e.add kt k args[1]! args[2]!]
+          | none => .error "std.int.map: an integer key is expected"
+        | _, _ => .fail },
+    { sig := sig "std.int.private.find" [.i, .i, .o]
+      run := fun c args => pure' <|
+        match c.syms.find? "std.map.leaf", c.syms.find? "std.map.node" with
+        | some leaf, some node =>
+          let e : IntAvl.Env := { c, leaf, node }
+          match e.key (c.store.deref args[0]! c.depth) with
+          | some k =>
+            match e.find k args[1]! with
+            | some v => one c #[args[0]!, args[1]!, v]
+            | none => .fail
+          | none => .error "std.int.map: an integer key is expected"
+        | _, _ => .fail },
+    { sig := sig "std.int.private.remove" [.i, .i, .o]
+      run := fun c args => pure' <|
+        match c.syms.find? "std.map.leaf", c.syms.find? "std.map.node" with
+        | some leaf, some node =>
+          let e : IntAvl.Env := { c, leaf, node }
+          match e.key (c.store.deref args[0]! c.depth) with
+          | some k => one c #[args[0]!, args[1]!, e.remove k args[1]!]
+          | none => .error "std.int.map: an integer key is expected"
+        | _, _ => .fail },
     { sig := sig "gettimeofday" [.o]
       run := fun c _ => pure' (one c #[.lit (.float (clockSeconds c.store.nextVar))]) },
     { sig := sig "halt" []

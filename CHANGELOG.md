@@ -4,13 +4,14 @@
 
 ### Added
 - ELPI 1.18 syntax (OpenSpec change `close-compat-gaps`): `macro @name X :- body.`, `pi x y z\ body` and `sigma x y\ body`, blanks before a binder's backslash, a trailing comma in a list, `:index (...)` before a declaration.
+- Integer-keyed `std.int.map` and `std.int.set` insert, find and remove natively (`IntAvl`); `set_ho` 72 s to 3 s.
 - `:index (d1 … dn)` on a `pred` declaration is used (OpenSpec change `add-deep-indexing`): a call is offered only the clauses and hypotheses whose indexed arguments do not clash with its own to that depth. `dt` 18 s to 4 s, `index2` 47 s to 6 s.
 - Library: `std.int.map`, `std.int.set`, `std.time` and the `gettimeofday` builtin; `std.map` is now a balanced tree with the type `std.map K V`.
 - `tests/Core/Compat.lean`; the benchmark covers every ELPI performance program.
 
 ### Changed
 - An undeclared constant in a program that declares no types is a warning (printed by the CLI), as in ELPI; programs that declare types keep the error.
-- The unifier's fast path scans at most 4096 nodes of the term it binds a variable to (cyclic or out-of-scope bindings of larger terms are no longer caught; ELPI never checks).
+- The unifier's fast path scans at most 256 nodes of the term it binds a variable to (cyclic or out-of-scope bindings of larger terms are no longer caught; ELPI never checks).
 - Lake rebuilds the library when `lib/elpi/*.elpi` changes.
 - Upstream suite: 52 of 114 pass (was 43).
 

@@ -14,7 +14,7 @@ Eleven of the twenty-one ELPI performance programs, and 71 of the 114 upstream t
 - **An undeclared constant in an untyped program** (one that declares no kinds, types or predicates of its own) is a warning on standard error, as in the oracle, not an error. A program that declares types keeps the error.
 - **Library:** `std.map` is a balanced (AVL) tree with the type `std.map K V` and `std.set` is built on it; `std.int.map` and `std.int.set` are the integer-keyed versions; `std.time G T` measures a goal with a new `gettimeofday` builtin.
 - **Lake** now knows `lib/elpi/*.elpi` are inputs of the library; before, editing them left a stale library.
-- **Bounded scope scan:** the first-order fast path of the unifier examines at most 4096 nodes of a term before it binds a variable to it, because an accumulator bound at every step would otherwise cost quadratic time; ELPI performs no occurs check at all.
+- **Bounded scope scan:** the first-order fast path of the unifier examines at most 256 nodes of a term before it binds a variable to it, because an accumulator bound at every step would otherwise cost quadratic time; ELPI performs no occurs check at all.
 
 ## Capabilities
 

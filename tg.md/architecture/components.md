@@ -154,7 +154,7 @@ Environment extension and attributes (`@[elpi_builtin]`, `@[elpi_constraint_hand
 
 The clean-room `std` library: lists, maps, sets, strings, `findall`, `spy`, `assert!`, with upstream predicate names. Source: `Elpi/Std/Std.lean` and `lib/elpi/std.elpi`.
 
-`std.map K V` is a height-balanced (AVL) tree that carries its comparison function, `std.set` is a map to `unit`, and `std.int.map` / `std.int.set` fix the key type; all are ELPI source, written from the textbook algorithm. `std.time G T` measures a goal with the `gettimeofday` builtin. The embedded files are inputs of the library in the lakefile, so editing `lib/elpi` rebuilds it.
+`std.map K V` is a height-balanced (AVL) tree that carries its comparison function, `std.set` is a map to `unit`, and `std.int.map` / `std.int.set` fix the key type; all are ELPI source, written from the textbook algorithm. `std.time G T` measures a goal with the `gettimeofday` builtin. The embedded files are inputs of the library in the lakefile, so editing `lib/elpi` rebuilds it. Insert, find and remove for integer keys (`std.int.map`, `std.int.set`) run natively in Lean on the same trees (`IntAvl` in `Elpi/Core/Builtins.lean`), because interpreting the balancing costs a few hundred resolution steps per key; a map ordered by another comparison uses the library code.
 
 - module:: Elpi.Std.Std
 - milestone:: M1

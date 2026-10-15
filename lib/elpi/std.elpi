@@ -387,16 +387,25 @@ typeabbrev std.int.set (std.set int).
 pred std.int.map.empty o:std.int.map V.
 std.int.map.empty M :- std.map.make cmp_term M.
 
+% Insert, find and remove for integer keys run natively on the same trees (see IntAvl in
+% Elpi/Core/Builtins.lean); a map ordered by another comparison falls back to the generic code.
+pred std.int.private.add i:int, i:V, i:std.map.tree int V, o:std.map.tree int V.
+pred std.int.private.find i:int, i:std.map.tree int V, o:V.
+pred std.int.private.remove i:int, i:std.map.tree int V, o:std.map.tree int V.
+
 pred std.int.map.add i:int, i:V, i:std.int.map V, o:std.int.map V.
+std.int.map.add K V (std.map.map cmp_term T) (std.map.map cmp_term T1) :- !, std.int.private.add K V T T1.
 std.int.map.add K V M M1 :- std.map.add K V M M1.
 
 pred std.int.map.find i:int, i:std.int.map V, o:V.
+std.int.map.find K (std.map.map cmp_term T) V :- !, std.int.private.find K T V.
 std.int.map.find K M V :- std.map.find K M V.
 
 pred std.int.map.mem i:int, i:std.int.map V.
-std.int.map.mem K M :- std.map.mem K M.
+std.int.map.mem K M :- std.int.map.find K M _.
 
 pred std.int.map.remove i:int, i:std.int.map V, o:std.int.map V.
+std.int.map.remove K (std.map.map cmp_term T) (std.map.map cmp_term T1) :- !, std.int.private.remove K T T1.
 std.int.map.remove K M M1 :- std.map.remove K M M1.
 
 pred std.int.map.bindings i:std.int.map V, o:list (pair int V).
@@ -410,13 +419,13 @@ pred std.int.set.empty o:std.int.set.
 std.int.set.empty S :- std.set.make cmp_term S.
 
 pred std.int.set.add i:int, i:std.int.set, o:std.int.set.
-std.int.set.add K S S1 :- std.set.add K S S1.
+std.int.set.add K (std.set.set M) (std.set.set M1) :- std.int.map.add K unit M M1.
 
 pred std.int.set.mem i:int, i:std.int.set.
-std.int.set.mem K S :- std.set.mem K S.
+std.int.set.mem K (std.set.set M) :- std.int.map.mem K M.
 
 pred std.int.set.remove i:int, i:std.int.set, o:std.int.set.
-std.int.set.remove K S S1 :- std.set.remove K S S1.
+std.int.set.remove K (std.set.set M) (std.set.set M1) :- std.int.map.remove K M M1.
 
 pred std.int.set.elements i:std.int.set, o:list int.
 std.int.set.elements S L :- std.set.elements S L.
@@ -425,7 +434,9 @@ pred std.int.set.cardinal i:std.int.set, o:int.
 std.int.set.cardinal S N :- std.set.cardinal S N.
 
 pred std.int.set.filter i:std.int.set, i:(int -> prop), o:std.int.set.
-std.int.set.filter S P S1 :- std.set.filter S P S1.
+std.int.set.filter S P S1 :-
+  std.int.set.elements S L, std.filter L P L1,
+  std.int.set.empty E, std.fold L1 E std.int.set.add S1.
 
 % The set of the images of the elements: F X Y relates an element to its image.
 pred std.int.set.map i:std.int.set, i:(int -> int -> prop), o:std.int.set.

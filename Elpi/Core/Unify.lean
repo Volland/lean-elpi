@@ -134,7 +134,7 @@ inductive Sol where
 accepted without the rest of the scan. The scan is linear in the term, so an accumulator that is
 bound to a list of n elements at every one of n steps would otherwise cost n² (ELPI never scans).
 Every cyclic or out-of-scope binding of an ordinary-sized term is still rejected. -/
-def scanBudget : Nat := 4096
+def scanBudget : Nat := 256
 
 /-- Result of `scanClean` for a term that is not clean (any number above `scanBudget`). -/
 def notClean : Nat := scanBudget + 1

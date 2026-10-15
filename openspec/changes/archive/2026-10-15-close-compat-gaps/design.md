@@ -18,10 +18,10 @@ The previous map was an unbalanced tree whose `remove` rebuilt everything. It is
 
 ### D4. A bounded scan, not a different check
 
-The unifier's first-order fast path scans a term for the variable being bound and for deeper variables. The scan stops after `scanBudget` nodes and accepts the binding. Cyclic or out-of-scope bindings of terms under that size are rejected as before; a larger term is bound as ELPI binds every term.
+The unifier's first-order fast path scans a term for the variable being bound and for deeper variables. The scan stops after `scanBudget` (256) nodes and accepts the binding. Cyclic or out-of-scope bindings of terms under that size are rejected as before; a larger term is bound as ELPI binds every term.
 
 ## Risks
 
-- A binding that creates a cycle or lets a name escape its scope through a term of more than 4096 nodes is not caught.
+- A binding that creates a cycle or lets a name escape its scope through a term of more than 256 nodes is not caught.
 - `std.int.set` and `std.int.map` are interpreted code where ELPI's are native, so programs that use them heavily (`set_ho`) are far slower than ELPI.
 - `:index` is accepted but not used: deep or multi-argument indexing is a separate feature, and `index2` and `dt` are slow without it.
