@@ -81,10 +81,8 @@ unsafe def enableInitUnsafe : IO Unit := Lean.enableInitializersExecution
 
 @[implemented_by enableInitUnsafe] opaque enableInit : IO Unit
 
-/-- `Environment.freeRegions` is `unsafe` (the environment must not be used afterwards). -/
-unsafe def freeEnvUnsafe (env : Lean.Environment) : IO Unit := env.freeRegions
-
-@[implemented_by freeEnvUnsafe] opaque freeEnv (env : Lean.Environment) : IO Unit
+/-- Environments imported by `elabSource`, by header text. -/
+initialize elabEnvCache : IO.Ref (Array (String × Lean.Environment)) ← IO.mkRef #[]
 
 /-- Elaborate Lean source text (with its `import` header) and return the messages with their
 positions: `(severity, line, column, text)`. -/
@@ -94,16 +92,23 @@ def elabSource (src : String) (fileName : String := "<test>") :
   enableInit
   let inputCtx := Lean.Parser.mkInputContext src fileName
   let (header, parserState, messages) ← Lean.Parser.parseHeader inputCtx
-  let (env, messages) ← Lean.Elab.processHeader header {} messages inputCtx
+  -- Importing `Lean` and `Elpi` costs about 2 GB that stays mapped for the life of the process,
+  -- so a test with a dozen calls would need more memory than a hosted CI runner has (LF/Certify
+  -- peaked at 23 GB). An `Environment` is an immutable value: import once per distinct header
+  -- and elaborate every call's commands on top of it.
+  let key := String.Pos.Raw.extract src ⟨0⟩ parserState.pos
+  let (env, messages) ←
+    match (← elabEnvCache.get).find? (·.1 == key) with
+    | some (_, e) => pure (e, messages)
+    | none => do
+      let (e, ms) ← Lean.Elab.processHeader header {} messages inputCtx
+      elabEnvCache.modify (·.push (key, e))
+      pure (e, ms)
   let cmdState := Lean.Elab.Command.mkState env messages {}
   let s ← Lean.Elab.IO.processCommands inputCtx parserState cmdState
   let mut out := []
   for m in s.commandState.messages.toList do
     out := out ++ [(m.severity, m.pos.line, m.pos.column, ← m.data.toString)]
-  -- Release the imported .olean regions: every call imports `Lean` and `Elpi` afresh, and without
-  -- this each one keeps about 2 GB mapped for the life of the process (a test with a dozen
-  -- calls then needs more memory than a hosted CI runner has).
-  freeEnv s.commandState.env
   return out
 
 end TestUtil
