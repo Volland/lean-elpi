@@ -19,7 +19,10 @@ jobs:
       - name: Core must not import Lean.Meta / Lean.Elab
         run: scripts/check-core-imports.sh
       - name: Tests
-        run: lake test
+        # the conformance self-test runs the real ELPI, so the oracle's opam switch must be active
+        run: |
+          eval "$(opam env --switch=lean-elpi-oracle)"
+          lake test
       - name: Bindings (C library, Python, Node.js, Rust)
         run: |
           scripts/check-versions.sh
