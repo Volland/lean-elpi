@@ -18,6 +18,10 @@ namespace Elpi
 structure LocalClause where
   term : Term
   depth : Nat
+  /-- Head predicate and first-argument key, worked out when the clause was added (`none`:
+  the head was not yet visible, so it is recomputed at each call). -/
+  head : Option ConstId := none
+  key : Key := .flex
   deriving Inhabited
 
 /-- Hypothetical clauses, newest group first. -/

@@ -118,16 +118,9 @@ structure Clause where
   pos : Pos := {}
   deriving Inhabited
 
-/-- First-argument key of a clause head or of a call. -/
-inductive Key where
-  | const (c : ConstId)
-  | int (i : Int)
-  | str (s : String)
-  | flex
-  deriving BEq, Hashable, Inhabited
-
 def Key.ofTerm : Term → Key
   | .const c => .const c
+  | .bound l => .bound l
   | .app (.const c) _ => .const c
   | .lit (.int i) => .int i
   | .lit (.str s) => .str s

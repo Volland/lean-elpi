@@ -240,14 +240,37 @@ partial def localHead (s : Store) (t : Term) (d : Nat) : Option ConstId :=
   | .const c => some c
   | _ => none
 
+/-- First-argument key of a hypothetical clause stored at depth `base`: an eigenvariable (a
+level below `base`) is rigid, while the clause's own `pi`-bound names are variables. -/
+partial def localKey (s : Store) (base : Nat) (t : Term) (d : Nat) : Key :=
+  match s.deref t d with
+  | .app (.const c) #[.lam b] => if c == cPi then localKey s base b (d + 1) else .flex
+  | .app (.const c) #[h, _] => if c == cNeck then localKey s base h d else firstArgKey s base t d
+  | t' => firstArgKey s base t' d
+where
+  firstArgKey (s : Store) (base : Nat) (t : Term) (d : Nat) : Key :=
+    match s.deref t d with
+    | .app _ as => if h : 0 < as.size then
+        (match s.deref as[0] d with
+         | .bound l => if l < base then .bound l else .flex
+         | a => Key.ofTerm a)
+      else .flex
+    | _ => .flex
+
+/-- A hypothetical clause with its head and first-argument key worked out now. -/
+def mkLocal (s : Store) (t : Term) (d : Nat) : LocalClause :=
+  match localHead s t d with
+  | some h => { term := t, depth := d, head := some h, key := localKey s d t d }
+  | none => { term := t, depth := d }
+
 /-- Split a clause set (`,`-conjunction or list) into hypothetical clauses. -/
 partial def toLocals (s : Store) (t : Term) (d : Nat) : List LocalClause :=
   match s.deref t d with
   | .app (.const c) #[a, b] =>
     if c == cConj || c == cCons then toLocals s a d ++ toLocals s b d
-    else [{ term := t, depth := d }]
-  | .const c => if c == cTrue || c == cNil then [] else [{ term := t, depth := d }]
-  | _ => [{ term := t, depth := d }]
+    else [mkLocal s t d]
+  | .const c => if c == cTrue || c == cNil then [] else [mkLocal s t d]
+  | _ => [mkLocal s t d]
 
 /-- Unify head arguments (from position `i`) with goal arguments, in match mode for input
 positions. The store is returned in every case, with partial bindings after a failure. -/
@@ -674,11 +697,17 @@ partial def callPred {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m 
       | .error msg => return .done (.error (.runtime msg))
       | .alts s' l => tryStream env M s' f l
     | none =>
-      let key := if h : 0 < args.size then Key.ofTerm (s.deref args[0] d) else .flex
-      let key := match key with | .flex => .flex | k => k
+      -- normalise the arguments' heads once: later steps then find them already dereferenced
+      let args := args.map (s.deref · d)
+      let key := if h : 0 < args.size then Key.ofTerm args[0] else .flex
       let mut cands : Array Cand := #[]
       for lc in f.locals do
-        if localHead s lc.term lc.depth == some c then cands := cands.push (.local lc)
+        let ok :=
+          match lc.head with
+          | some h => h == c && lc.key.compatible key
+          | none => localHead s lc.term lc.depth == some c &&
+                    (localKey s lc.depth lc.term lc.depth).compatible key
+        if ok then cands := cands.push (.local lc)
       match env.db.preds.find? c with
       | some db =>
         for i in db.candidates key do

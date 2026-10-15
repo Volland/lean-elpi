@@ -103,13 +103,42 @@ partial def subst (t : Term) (d : Nat) (a : Term) (k : Nat := 0) : Term :=
   | .cvar i as => .cvar i (as.map (subst · d a k))
   | t => t
 
-/-- Apply `f` (living at depth `D`) to `args`, β-reducing when `f` is a `lam`. -/
+/-- Substitute `args` for the levels `d, d+1, …, d+n-1` at once in `t` (which lives at depth
+`d+n+k`), lowering levels `≥ d+n` by `n`: `subst` for several arguments in one traversal. Each
+`args[i]` lives at depth `d`. The result lives at depth `d+k`. -/
+partial def substN (t : Term) (d : Nat) (args : Array Term) (k : Nat) : Term :=
+  let n := args.size
+  match t with
+  | .bound l =>
+    if l < d then t
+    else if l < d + n then args[l - d]!.shiftUp d k
+    else .bound (l - n)
+  | .app h as =>
+    let as' := as.map (substN · d args k)
+    match h with
+    | .bound l =>
+      if d ≤ l && l < d + n then applyAt (args[l - d]!.shiftUp d k) as' (d + k)
+      else .app (substN h d args k) as'
+    | _ => .app h as'
+  | .lam b => .lam (substN b d args (k + 1))
+  | .uvar u as => .uvar u (as.map (substN · d args k))
+  | .cvar i as => .cvar i (as.map (substN · d args k))
+  | t => t
+
+/-- Apply `f` (living at depth `D`) to `args`, β-reducing when `f` is a `lam`. All the
+arguments that meet a λ are substituted in one pass. -/
 partial def applyAt (f : Term) (args : Array Term) (D : Nat) : Term :=
   if args.isEmpty then f else
   match f with
-  | .lam b =>
-    let r := subst b D args[0]!
-    applyAt r (args.extract 1 args.size) D
+  | .lam _ =>
+    -- peel as many λs as there are arguments
+    let rec peel (t : Term) (m : Nat) : Term × Nat :=
+      match t with
+      | .lam b => if m < args.size then peel b (m + 1) else (t, m)
+      | _ => (t, m)
+    let (body, m) := peel f 0
+    let r := substN body D (if m == args.size then args else args.extract 0 m) 0
+    if m == args.size then r else applyAt r (args.extract m args.size) D
   | _ => mkApp f args
 end
 
@@ -140,6 +169,23 @@ where
 def instantiate (body : Term) (d : Nat) (a : Term) : Term := subst body d a 0
 
 end Term
+
+/-- First-argument key of a clause head or of a call. -/
+inductive Key where
+  | const (c : ConstId)
+  | int (i : Int)
+  | str (s : String)
+  /-- An eigenvariable (a `pi`-bound name): it is rigid and equal only to itself. -/
+  | bound (l : Nat)
+  | flex
+  deriving BEq, Hashable, Inhabited
+
+/-- Can a clause with first-argument key `k` match a call whose first argument has key `k'`?
+Only when neither is a variable and they differ is the answer no. -/
+def Key.compatible (k k' : Key) : Bool :=
+  match k, k' with
+  | .flex, _ | _, .flex => true
+  | _, _ => k == k'
 
 /-- Errors raised while loading or running a program. `outOfFuel` is a resource error,
 distinct from failure. -/
