@@ -26,11 +26,11 @@ The library SHALL export `leanelpi_init`, `leanelpi_version`, `leanelpi_load`, `
 - **THEN** every thread gets the answers of its own program
 
 ### Requirement: Self-contained shared library
-`scripts/build-ffi.sh` SHALL produce `dist/libleanelpi.dylib` or `dist/libleanelpi.so` and `dist/leanelpi.h`. The library SHALL contain the engine and the Lean runtime and SHALL depend only on the operating system's C and C++ runtime libraries, so that it runs on a machine without a Lean toolchain.
+`scripts/build-ffi.sh` SHALL produce `dist/libleanelpi.dylib` or `dist/libleanelpi.so` and `dist/leanelpi.h`. The library SHALL contain the engine and SHALL depend only on the operating system's C and C++ runtime libraries and on the Lean runtime libraries that the build places in the same directory (none on macOS, where the runtime is linked in; `libleanshared` on Linux, whose toolchain archives cannot be linked into a shared object), so that it runs on a machine without a Lean toolchain.
 
 #### Scenario: No Lean dependency at run time
 - **WHEN** the dynamic dependencies of the built library are listed
-- **THEN** none of them is a Lean, Lake or GMP library
+- **THEN** none of them is a Lean, Lake or GMP library other than those shipped beside it
 
 ### Requirement: Python binding
 The `leanelpi` Python package SHALL expose `Program`, `Solution`, `ElpiError` and `version`. `Program(source)` SHALL compile a program. `first`, `solve`, `solve_all` and `ask` SHALL query it, with `limit` and `fuel` options; a failed query SHALL be an empty result, not an exception. `assert_clause` SHALL return a new `Program`. Engine errors SHALL raise `ElpiError`. `close()` and the context manager SHALL free the handle, after which use SHALL raise `ValueError`. The package SHALL find the library in `$LEANELPI_LIB`, inside the package, or in `dist/` of a checkout.

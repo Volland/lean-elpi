@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - { os: macos-14,        wheel_plat: macosx_11_0_arm64,        name: darwin-arm64 }
@@ -51,7 +51,7 @@ jobs:
         run: |
           scripts/package-python.sh
           scripts/package-node.sh
-          tar -C dist -czf dist/libleanelpi-${{ matrix.name }}.tar.gz $(cd dist && ls libleanelpi.* leanelpi.h)
+          tar -C dist -czf dist/libleanelpi-${{ matrix.name }}.tar.gz $(cd dist && ls lib* leanelpi.h)
       - name: Packages are publishable
         run: scripts/verify-distribution.sh
       - name: Smoke test the packages in clean environments

@@ -14,9 +14,9 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "unsupported platform" >&2; exit 1 ;;
 esac
 export LEANELPI_WHEEL_PLAT
-rm -f bindings/python/leanelpi/libleanelpi.*
-cp dist/libleanelpi.* bindings/python/leanelpi/
+rm -f bindings/python/leanelpi/lib*
+cp dist/lib*.dylib dist/lib*.so* bindings/python/leanelpi/ 2>/dev/null || true
 rm -rf bindings/python/build bindings/python/*.egg-info
 python -m build --wheel --outdir dist/wheels bindings/python
-rm -f bindings/python/leanelpi/libleanelpi.*
+rm -f bindings/python/leanelpi/lib*
 python -m twine check dist/wheels/*.whl

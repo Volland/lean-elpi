@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # @tg: verifies:: [[openspec:language-bindings#Self-contained shared library#No Lean dependency at run time]]
-# Fail if dist/libleanelpi depends on anything but the system's C and C++ libraries.
+# Fail if dist/libleanelpi depends on a Lean library other than the ones shipped beside it
+# (Linux: libleanshared, libInit_shared; macOS: none).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ "$(uname -s)" = Darwin ]; then
@@ -9,6 +10,6 @@ else
   deps=$(ldd dist/libleanelpi.so | awk '{print $1}')
 fi
 echo "$deps"
-if echo "$deps" | grep -i -e lean -e lake -e gmp -e libuv; then
+if echo "$deps" | grep -i -v -e leanshared -e Init_shared | grep -i -e lean -e lake -e gmp -e libuv; then
   echo "libleanelpi still depends on a Lean library" >&2; exit 1
 fi

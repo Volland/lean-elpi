@@ -9,7 +9,8 @@ OS=$(node -p "process.platform"); CPU=$(node -p "process.arch")
 NAME="leanelpi-$OS-$CPU"
 PKG="@lean-elpi/$NAME"
 OUT=dist/npm; rm -rf "$OUT/$NAME"; mkdir -p "$OUT/$NAME"
-cp dist/libleanelpi.* LICENSE "$OUT/$NAME/"
+cp dist/lib*.dylib dist/lib*.so* LICENSE "$OUT/$NAME/" 2>/dev/null || true
+cp LICENSE "$OUT/$NAME/"
 cat > "$OUT/$NAME/package.json" <<JSON
 {
   "name": "$PKG",
@@ -17,7 +18,7 @@ cat > "$OUT/$NAME/package.json" <<JSON
   "description": "The native LeanElpi library for $OS-$CPU, loaded by the leanelpi package",
   "os": ["$OS"],
   "cpu": ["$CPU"],
-  "files": ["libleanelpi.*", "LICENSE"],
+  "files": ["lib*", "LICENSE"],
   "publishConfig": { "access": "public" },
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/Volland/lean-elpi.git" }

@@ -36,7 +36,7 @@ You get the engine, the standard library, typed clauses, modes, constraints and 
 
 | Language | Command | Notes |
 |---|---|---|
-| Python ≥ 3.9 | `pip install leanelpi` | a platform wheel with the library inside |
+| Python ≥ 3.9 | `pip install leanelpi` | a platform wheel with the library inside (on Linux, with the Lean runtime library beside it) |
 | Node.js ≥ 18 | `npm install @lean-elpi/leanelpi` | npm picks the library for your platform; no compiler needed |
 | Rust ≥ 1.70 | `cargo add leanelpi` | needs the library separately, see below |
 

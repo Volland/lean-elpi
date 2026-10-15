@@ -29,7 +29,7 @@ Source = "https://github.com/Volland/lean-elpi"
 packages = ["leanelpi"]
 
 [tool.setuptools.package-data]
-leanelpi = ["libleanelpi.*"]
+leanelpi = ["lib*.dylib", "lib*.so", "lib*.so.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # @tg: implements:: [[openspec:language-bindings#Self-contained shared library]]
-# Build dist/libleanelpi.{dylib,so}: the Elpi engine, the Lean runtime and the C API of
-# ffi/leanelpi.h in ONE self-contained shared library. Only the Lean toolchain (elan) and a C
-# compiler are needed to build it; nothing but the system C libraries is needed to run it.
+# Build dist/libleanelpi.{dylib,so}: the Elpi engine and the C API of ffi/leanelpi.h.
+# macOS: the Lean runtime is linked in, giving ONE self-contained file.
+# Linux: the toolchain's static runtime is not position-independent, so the library links to
+#        libleanshared, which is copied next to it (rpath $ORIGIN); ship the files together.
+# Only the Lean toolchain (elan) and a C compiler are needed to build; nothing else to run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -17,6 +19,7 @@ mkdir -p "$OUT"
 
 OURS=("$LIBS/liblean_x2delpi_Elpi.a" "$LIBS/liblean_x2delpi_ElpiFfi.a")
 RUNTIME=(-L"$PREFIX/lib/lean" -L"$PREFIX/lib" -lLean -lStd -lInit -lleancpp -lleanrt -lgmp -luv)
+rm -f "$OUT"/lib*.so* "$OUT"/lib*.dylib
 
 case "$(uname -s)" in
   Darwin)
@@ -36,11 +39,14 @@ case "$(uname -s)" in
     "$PREFIX/bin/leanc" -shared -fPIC -Wl,-soname,libleanelpi.so \
       -o "$OUT/libleanelpi.$EXT" "$OUT/leanelpi.o" \
       -Wl,--whole-archive "${OURS[@]}" -Wl,--no-whole-archive \
-      "${RUNTIME[@]}" -Wl,--gc-sections -Wl,--as-needed -Wl,-Bsymbolic
+      -L"$PREFIX/lib/lean" -lleanshared -Wl,-rpath,'$ORIGIN' -Wl,--as-needed -Wl,-Bsymbolic
+    for f in "$PREFIX"/lib/lean/libleanshared*.so* "$PREFIX"/lib/lean/libInit_shared.so*; do
+      [ -e "$f" ] && cp -L "$f" "$OUT/"
+    done
     strip --strip-unneeded "$OUT/libleanelpi.$EXT"
     ;;
 esac
 
 rm "$OUT/leanelpi.o"
 cp ffi/leanelpi.h "$OUT/"
-echo "built $OUT/libleanelpi.$EXT ($(du -h "$OUT/libleanelpi.$EXT" | cut -f1))"
+echo "built $OUT/libleanelpi.$EXT; files to ship: $(cd "$OUT" && ls lib* | tr '\n' ' ')"
