@@ -13,7 +13,8 @@ trap 'rm -rf "$tmp"' EXIT
 oracle="$(command -v elpi)"
 failures=0
 
-printf '#!/bin/sh\nelpi "$@" >"%s/rev.out" 2>/dev/null; tail -r "%s/rev.out"\n' "$tmp" "$tmp" >"$tmp/reversing"
+# reverse the lines with awk: `tail -r` is BSD-only and GNU tail has no such option
+printf '#!/bin/sh\nelpi "$@" >"%s/rev.out" 2>/dev/null; awk '"'"'{l[NR]=$0} END{for(i=NR;i>0;i--)print l[i]}'"'"' "%s/rev.out"\n' "$tmp" "$tmp" >"$tmp/reversing"
 printf '#!/bin/sh\necho 2.0.0\n' >"$tmp/elpi2"
 chmod +x "$tmp/reversing" "$tmp/elpi2"
 : >"$tmp/no-divergences.md"
