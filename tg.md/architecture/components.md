@@ -367,8 +367,18 @@ This is the one component with working code today: its `implements` and `verifie
 
 Runs ELPI 1.18's own test programs, copied under `tests/upstream/`, on `lean-elpi` and judges each by upstream's rule: exit 0 is success unless the registry expects failure or an output pattern.
 
-`manifest.tsv` is generated from upstream's `tests/suite/*.ml` registry by `extract.py` (name, category, source, expectation, flags, stdin). `run.sh [lean|oracle]` runs it; `oracle` mode runs the real ELPI and must pass everything, which proves the copy and the runner. Failing tests are registered with their first error in `known-failures.md` and reported as `known`, or `stale` once they pass. Trace-format tests, performance categories and the large corpora (set `UPSTREAM_SOURCES`) are skipped. The copied sources are LGPL-2.1 (`LICENSE-ELPI`).
+`manifest.tsv` is generated from upstream's `tests/suite/*.ml` registry by `extract.py` (name, category, source, expectation, flags, stdin). `run.sh [lean|oracle]` runs it; `oracle` mode runs the real ELPI and must pass everything, which proves the copy and the runner. Failing tests are registered with their first error in `known-failures.md` and reported as `known`, or `stale` once they pass. Trace-format tests, performance categories (timed by [[components#Benchmark harness]]) and the large corpora (set `UPSTREAM_SOURCES`) are skipped. The copied sources are LGPL-2.1 (`LICENSE-ELPI`).
 
 - module:: tests/upstream
 - depends_on:: [[components#Conformance harness]]
 - motivated_by:: [[decisions#ELPI 1.18 dialect]]
+
+## Benchmark harness
+
+Times `lean-elpi`, ELPI 1.18 and, where a program is also a Teyjus module, Teyjus on ELPI's own performance programs plus a few small ones of ours. It reports median and best wall time and peak memory per engine.
+
+`tests/bench/run.py` runs each workload N times (default 5) under one shared stack limit, from `tests/upstream/sources` (the `performance_FO` and `performance_HO` programs) and `tests/bench/programs` (`nrev`, `fib`, `hoabs`, sized to finish on every engine). A run that exits non-zero or exceeds the timeout is recorded as that status, never as a time. Teyjus comes from `TEYJUS_BIN`; it needs OCaml below 5.0. Results are published in the blog post [Compatibility and performance](site/content/blog/compatibility-and-performance.md).
+
+- module:: tests/bench
+- depends_on:: [[components#Upstream compatibility suite]]
+- motivated_by:: [[papers/engine#A Persistent Abstract Machine for Lambda Prolog#Performance expectations]]

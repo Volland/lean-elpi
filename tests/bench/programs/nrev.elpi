@@ -1,0 +1,20 @@
+% Naive reverse of a 400-element list, repeated 5 times (about 400k logical inferences).
+% First-order, no builtins besides the arithmetic used to build the input.
+type app list int -> list int -> list int -> prop.
+type nrev list int -> list int -> prop.
+type range int -> int -> list int -> prop.
+type loop int -> list int -> prop.
+
+app [] L L.
+app [X|Xs] L [X|R] :- app Xs L R.
+
+nrev [] [].
+nrev [X|Xs] R :- nrev Xs R1, app R1 [X] R.
+
+range N N [N] :- !.
+range I N [I|T] :- I < N, J is I + 1, range J N T.
+
+loop 0 _ :- !.
+loop K L :- nrev L _, K1 is K - 1, loop K1 L.
+
+main :- range 1 400 L, loop 5 L.

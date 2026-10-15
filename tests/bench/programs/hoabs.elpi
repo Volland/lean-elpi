@@ -1,0 +1,15 @@
+% Higher-order workload: normalise the Church numeral 5 applied to itself (3125) with pi and => under binders.
+kind tm type.
+type lam (tm -> tm) -> tm.
+type app tm -> tm -> tm.
+type nf tm -> tm -> prop.
+type church int -> tm -> prop.
+
+nf (lam F) (lam G) :- pi x\ nf x x => nf (F x) (G x).
+nf (app M N) R :- nf M (lam F), nf N N1, nf (F N1) R.
+nf (app M N) (app M1 N1) :- nf M M1, not (M1 = lam _), nf N N1.
+
+church 0 (lam f\ lam x\ x) :- !.
+church N (lam f\ lam x\ app f (app (app C f) x)) :- M is N - 1, church M C.
+
+main :- church 5 C, nf (app C C) _.

@@ -1,0 +1,8 @@
+% Doubly recursive Fibonacci of 23 (about 92k calls): arithmetic and clause selection.
+type fib int -> int -> prop.
+
+fib 0 0 :- !.
+fib 1 1 :- !.
+fib N R :- A is N - 1, B is N - 2, fib A RA, fib B RB, R is RA + RB.
+
+main :- fib 23 R, R = 28657.

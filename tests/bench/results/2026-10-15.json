@@ -1,0 +1,488 @@
+{
+  "meta": {
+    "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu": "Apple M2 Max",
+    "elpi": "1.18.2",
+    "runs": 3,
+    "timeout": 300.0,
+    "date": "2026-10-15"
+  },
+  "workloads": {
+    "startup": {
+      "category": "-",
+      "elpi": {
+        "status": "ok",
+        "median": 0.06739591696532443,
+        "min": 0.06470816599903628,
+        "max": 0.06807383400155231,
+        "rss_mb": 15.450112,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 0.03528541704872623,
+        "min": 0.03496683400589973,
+        "max": 0.042120292026083916,
+        "rss_mb": 51.77344,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "rev": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.15691608301131055,
+        "min": 0.1559376249788329,
+        "max": 0.1583657079609111,
+        "rss_mb": 44.056576,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "-9"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "rev14": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.17425991699565202,
+        "min": 0.1673089589457959,
+        "max": 0.18042508303187788,
+        "rss_mb": 46.465024,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "-9"
+      },
+      "teyjus": {
+        "status": "ok",
+        "median": 0.07861825003055856,
+        "min": 0.06811016699066386,
+        "max": 0.16801554203266278,
+        "rss_mb": 38.58432,
+        "runs": 3
+      }
+    },
+    "queens": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.9433539169840515,
+        "min": 0.9005588340223767,
+        "max": 0.9796790829859674,
+        "rss_mb": 134.02112,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 66.49680204200558,
+        "min": 66.33566029201029,
+        "max": 67.14552791701863,
+        "rss_mb": 10472.472576,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "ok",
+        "median": 1.2913335830089636,
+        "min": 1.289778042002581,
+        "max": 1.3002754169865511,
+        "rss_mb": 65.45408,
+        "runs": 3
+      }
+    },
+    "zebra": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.6018007920356467,
+        "min": 0.5917497500195168,
+        "max": 0.6140030410024337,
+        "rss_mb": 17.301504,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "ok",
+        "median": 1.3573347089695744,
+        "min": 1.3562608329812065,
+        "max": 1.3632002499653026,
+        "rss_mb": 4.75136,
+        "runs": 3
+      }
+    },
+    "crypt": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 2.0861194159951992,
+        "min": 2.079747124982532,
+        "max": 2.095195750007406,
+        "rss_mb": 38.109184,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 44.83113841700833,
+        "min": 44.752008499985095,
+        "max": 45.79045662499266,
+        "rss_mb": 595.902464,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "ok",
+        "median": 4.057228874997236,
+        "min": 4.054263708007056,
+        "max": 4.065569708996918,
+        "rss_mb": 13.942784,
+        "runs": 3
+      }
+    },
+    "ackermann": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.0750613750424236,
+        "min": 0.07274633296765387,
+        "max": 0.07511179201537743,
+        "rss_mb": 15.859712,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 0.03486650000559166,
+        "min": 0.034706750011537224,
+        "max": 0.0351439579972066,
+        "rss_mb": 51.953664,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "mu": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 1.184155750030186,
+        "min": 1.1779940000269562,
+        "max": 1.1898280419991352,
+        "rss_mb": 16.95744,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 35.9128784170025,
+        "min": 35.83162437501596,
+        "max": 36.000255750026554,
+        "rss_mb": 6781.550592,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "ok",
+        "median": 3.258737916999962,
+        "min": 3.2566072909976356,
+        "max": 3.2907542919856496,
+        "rss_mb": 45.891584,
+        "runs": 3
+      }
+    },
+    "fast_mu": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.8554872079985216,
+        "min": 0.8486448749899864,
+        "max": 0.8620387500268407,
+        "rss_mb": 17.465344,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 13.661447667051107,
+        "min": 13.647797457990237,
+        "max": 13.704863624996506,
+        "rss_mb": 68.190208,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "ok",
+        "median": 1.8076357920072041,
+        "min": 1.8064507499802858,
+        "max": 1.8186964589986019,
+        "rss_mb": 4.571136,
+        "runs": 3
+      }
+    },
+    "index2": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 1.048002625000663,
+        "min": 1.0438794170040637,
+        "max": 1.066189375007525,
+        "rss_mb": 15.613952,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "deep_index": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.0664983750320971,
+        "min": 0.06535008299397305,
+        "max": 0.06775262503651902,
+        "rss_mb": 15.286272,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "map_rbtree": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 1.3734770829905756,
+        "min": 1.370108125032857,
+        "max": 1.3778745830059052,
+        "rss_mb": 18.055168,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "map_list": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 5.4350987920188345,
+        "min": 5.419952166965231,
+        "max": 5.46949054201832,
+        "rss_mb": 16.252928,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "map_ho": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.06797587499022484,
+        "min": 0.0679147089831531,
+        "max": 0.0710706670070067,
+        "rss_mb": 15.253504,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "set": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 1.164389542012941,
+        "min": 1.1558609580388293,
+        "max": 1.1726703750318848,
+        "rss_mb": 15.89248,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "set_ho": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.31342270801542327,
+        "min": 0.3112579170265235,
+        "max": 0.3190194169874303,
+        "rss_mb": 47.480832,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "dt": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.8969579170225188,
+        "min": 0.8922779999556951,
+        "max": 0.8981963749974966,
+        "rss_mb": 14.893056,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "1"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "cbv": {
+      "category": "HO",
+      "elpi": {
+        "status": "ok",
+        "median": 1.620550791034475,
+        "min": 1.6198433329700492,
+        "max": 1.645711583958473,
+        "rss_mb": 16.7936,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 64.65367866703309,
+        "min": 64.35994641698198,
+        "max": 65.13117679103743,
+        "rss_mb": 15552.004096,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "cbn": {
+      "category": "HO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.23639366700081155,
+        "min": 0.23600033402908593,
+        "max": 0.23814075003610924,
+        "rss_mb": 17.154048,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 33.64950170798693,
+        "min": 33.58448079199297,
+        "max": 33.666750582982786,
+        "rss_mb": 3677.929472,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "lambda3": {
+      "category": "HO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.27261124999495223,
+        "min": 0.27190808398881927,
+        "max": 0.2785019589937292,
+        "rss_mb": 17.154048,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "timeout"
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "nrev400": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.15090499998768792,
+        "min": 0.14938879199326038,
+        "max": 0.15474995801923797,
+        "rss_mb": 14.712832,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 7.527830042003188,
+        "min": 7.501362332957797,
+        "max": 7.642283458029851,
+        "rss_mb": 3742.02368,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "fib23": {
+      "category": "FO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.12509887502528727,
+        "min": 0.12435325002297759,
+        "max": 0.1314460000139661,
+        "rss_mb": 15.187968,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 0.5120543750235811,
+        "min": 0.5086422080057673,
+        "max": 0.5252887500100769,
+        "rss_mb": 93.503488,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    },
+    "church5": {
+      "category": "HO",
+      "elpi": {
+        "status": "ok",
+        "median": 0.08495470799971372,
+        "min": 0.08290895802201703,
+        "max": 0.09577350004110485,
+        "rss_mb": 15.777792,
+        "runs": 3
+      },
+      "lean-elpi": {
+        "status": "ok",
+        "median": 2.850453374965582,
+        "min": 2.84746991697466,
+        "max": 2.8552769999951124,
+        "rss_mb": 943.407104,
+        "runs": 3
+      },
+      "teyjus": {
+        "status": "n/a"
+      }
+    }
+  }
+}

@@ -368,7 +368,7 @@ Beyond CHR written in ELPI, the [[decisions#Tiered solver API]] lets Lean code p
 
 ## Performance expectations
 
-The first implementation is expected to run 3 to 10 times slower than OCaml ELPI. The design leaves room to close that gap without changing the machine.
+The first implementation was expected to run 3 to 10 times slower than OCaml ELPI. Measured on 0.3.0 it is about 30 times slower and uses far more memory ([[components#Benchmark harness]]); the design still leaves room to close the gap.
 
 The slowdown has known sources: persistent maps cost a logarithmic factor where OCaml ELPI writes a mutable reference; terms are boxed Lean values with reference counting; and the first version interprets clause bodies instead of compiling them. For the intended uses (tactics, derivers, rule engines inside programs) that is acceptable, and correctness against the oracle comes first.
 
@@ -378,7 +378,7 @@ Optimisations planned behind the `Store` interface, in rough order:
 2. **Path compression** in variable dereferencing, cached in the persistent map.
 3. **A mutable store for pure queries** that never backtrack across a host-state boundary, built on `ST` and selected per query. The machine sees the same `Store` interface.
 4. **Clause precompilation**: heads compiled to matching code, and indexing beyond the first argument once `:index` is supported.
-5. **Benchmarks from the conformance corpus**, run against the oracle for timing as well as answers.
+5. **Benchmarks**, now in place: `tests/bench/run.py` times ELPI's own performance programs against the oracle, and its results set the order of the work above (memory first, since three programs exhaust it).
 
 Because the machine talks to the substitution only through the `Store` interface, each of these can land without touching resolution, cut or constraints, and the oracle keeps every step honest.
 
