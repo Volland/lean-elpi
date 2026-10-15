@@ -1,0 +1,35 @@
+pred works0.
+works0 :-
+  std.assert-ok! (unix.process.open _ ["printf", "foo\n"] _ P) "works0",
+  P = (unix.process _In Out _Err),
+  input_line Out Str,
+  std.assert! (Str = "foo") "bad output",
+  unix.process.close P ok.
+
+pred works1.
+works1 :-
+  std.assert-ok! (unix.process.open _ ["cat"] _ P) "works1",
+  P = (unix.process In Out _Err),
+  output In "foo\n",
+  close_out In,
+  input_line Out Str,
+  std.assert! (Str = "foo") "bad output",
+  unix.process.close P ok.
+
+pred starts-but-fails.
+starts-but-fails :-
+  std.assert-ok! (unix.process.open _ ["ls", "non-existent"] _ P) "starts-but-fails",
+  P = (unix.process _In _Out Err),
+  input_line Err L,
+  print "error from: ls non-existent:" L,
+  unix.process.close P (error Msg),
+  print "exit code:" Msg.
+
+pred does-not-start.
+does-not-start :-
+  unix.process.open "non-existent" _ _ (unix.process In Out Err) D,
+  std.assert! (D = error Msg) "does-not-exists",
+  print "Unix API error:" Msg,
+  var In, var Out, var Err.
+
+main :- std.spy-do! [ works0, works1, starts-but-fails, does-not-start ].

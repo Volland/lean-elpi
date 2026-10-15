@@ -1,0 +1,160 @@
+# name|category|source|expect|match|flags|input|skip
+name|builtins|name_builtin.elpi|success||-no-tc||
+nil_cons|builtins|nil_cons.elpi|success||||
+random|builtins|random.elpi|success||||
+findall|builtins|findall.elpi|success||||
+unix|builtins|unix.elpi|success||||
+cut1|correctness_FO|cut.elpi|success||||
+cut2|correctness_FO|cut2.elpi|success||||
+cut3|correctness_FO|cut3.elpi|success||||
+cut4|correctness_FO|cut4.elpi|success||||
+cut5|correctness_FO|cut5.elpi|success||||
+cut6|correctness_FO|cut6.elpi|success||||
+backtracking|correctness_FO|trail.elpi|success||||
+uminus|correctness_FO|uminus.elpi|success||||
+typeabbrv1|correctness_FO|typeabbrv1.elpi|success||||
+typeabbrv2|correctness_FO|typeabbrv2.elpi|failure||||
+typeabbrv3|correctness_FO|typeabbrv3.elpi|success||||
+typeabbrv4|correctness_FO|typeabbrv4.elpi|success||||
+typeabbrv5|correctness_FO|typeabbrv5.elpi|failure||||
+typeabbrv6|correctness_FO|typeabbrv6.elpi|failure||||
+typeabbrv7|correctness_FO|typeabbrv7.elpi|success||||
+typeabbrv8|correctness_FO|typeabbrv8.elpi|success||||
+typeabbrv9|correctness_FO|typeabbrv9.elpi|success||||
+typeabbrv10|correctness_FO|typeabbrv10.elpi|failure-output|regex|||
+typeabbrv11|correctness_FO|typeabbrv11.elpi|failure-output|regex|||
+typeabbrv12|correctness_FO|typeabbrv12.elpi|failure-output|regex|||
+conj2|correctness_FO|conj2.elpi|success||||
+conj2_legacy|correctness_FO|conj2.elpi|success||-legacy-parser||
+dt_var|correctness_FO|dt_var.elpi|output|regex|-no-tc||needs -trace-on JSON output
+dt_var2|correctness_FO|dt_var2.elpi|output|regex|-no-tc||needs -trace-on JSON output
+dt_multi1|correctness_FO|dt_multi1.elpi|output|regex|-no-tc||needs -trace-on JSON output
+dt_multi2|correctness_FO|dt_multi2.elpi|output|regex|-no-tc||needs -trace-on JSON output
+dt_multi3|correctness_FO|dt_multi3.elpi|failure-output|regex|-no-tc||needs -trace-on JSON output
+is|correctness_FO|is.elpi|success||||
+ho|correctness_HO|ho.elpi|success||||
+hc_interp|correctness_HO|hc_interp.elpi|success||||
+eta|correctness_HO|eta.elpi|success||||
+beta|correctness_HO|beta.elpi|success||||
+pi|correctness_HO|pi.elpi|success||||
+pi3|correctness_HO|pi3.elpi|success||||
+pi5|correctness_HO|pi5.elpi|success||||
+impl|correctness_HO|impl.elpi|success||||
+impl2|correctness_HO|impl2.elpi|success||||
+patternunif|correctness_HO|patternunif.elpi|success||||
+patternunif2|correctness_HO|patternunif2.elpi|success||||
+self_assignment|correctness_HO|self_assignment.elpi|success||||
+llam|correctness_HO|llam.elpi|success||||
+llamb0_exit1|correctness_HO|fragment_exit.elpi|success||||
+llamb0_exit2|correctness_HO|fragment_exit2.elpi|success||||
+llamb0_exit3|correctness_HO|fragment_exit3.elpi|success||||
+llamb0_exit4|correctness_HO|general_case.elpi|success||||
+llamb0_exit5|correctness_HO|general_case2.elpi|success||||
+llamb0_exit6|correctness_HO|general_case3.elpi|success||||
+restriction3|correctness_HO|restriction3.elpi|success||||
+restriction4|correctness_HO|restriction4.elpi|success||||
+restriction5|correctness_HO|restriction5.elpi|success||||
+restriction6|correctness_HO|restriction6.elpi|success||||
+restriction|correctness_HO|restriction.elpi|failure||||
+bug19|correctness_HO|GH_issue_19.elpi|success||||
+lambdadelta|correctness_HO|helena_elpi/lambdadelta.elpi|success||||large source not vendored (set UPSTREAM_SOURCES to the full tests/sources)
+notation|correctness_HO|notation.elpi|success||||
+notation_legacy|correctness_HO|notation_legacy.elpi|success||-legacy-parser||
+pnf|correctness_HO|pnf.elpi|success||||
+holp|correctness_HO|holp/main.mod|success||||
+holp_legacy|correctness_HO|holp_legacy/main.mod|success||-legacy-parser||
+ndprover|correctness_HO|ndprover/inter.mod|success|||ndprover.stdin|
+ndprover_legacy|correctness_HO|ndprover_legacy/inter.mod|success||-legacy-parser|ndprover.stdin|
+pcf|correctness_HO|pcf/pcf.mod|success||||
+pcf_legacy|correctness_HO|pcf_legacy/pcf.mod|success||-legacy-parser||
+progs|correctness_HO|progs/progs.mod|success||-delay-problems-outside-pattern-fragment||
+lambda_arrow1|correctness_HO|lambda.elpi|success||||
+lambda_arrow2|correctness_HO|lambda2.elpi|success||||
+hilbert|correctness_HO|hilbert/hilbert.mod|success||-delay-problems-outside-pattern-fragment||
+hilbert2|correctness_HO|hilbert2/hilbert2.mod|success||-delay-problems-outside-pattern-fragment||
+eta_as|correctness_HO|eta_as.elpi|success||-no-tc||
+hdclause|correctness_HO|hdclause.elpi|success||-no-tc||
+namespace00|elpi_specific|namespaces00.elpi|success||||
+namespace01|elpi_specific|namespaces01.elpi|success||||
+namespace02|elpi_specific|namespaces02.elpi|success||||
+namespace03|elpi_specific|namespaces03.elpi|success||||
+shorten|elpi_specific|shorten.elpi|success||||
+shorten-EOF|elpi_specific|shorten2.elpi|success||||
+shorten_trie|elpi_specific|shorten_trie.elpi|success||||
+shorten_builtin|elpi_specific|shorten_builtin.elpi|success||||
+named_clauses00|elpi_specific|named_clauses00.elpi|failure||||
+named_clauses01|elpi_specific|named_clauses01.elpi|failure||||
+named_clauses02|elpi_specific|named_clauses02.elpi|success||||
+discard|elpi_specific|discard.elpi|success||||
+chr|elpi_specific|chr.elpi|success||||
+chr_leq|elpi_specific|chrLEQ.elpi|success||||
+chr_nokey|elpi_specific|chr_nokey.elpi|success||||
+chr_gcd|elpi_specific|chrGCD.elpi|success||||
+chr_nokey2|elpi_specific|chr_nokey2.elpi|success||||
+chr_sem|elpi_specific|chr_sem.elpi|success||||
+chr_ut|elpi_specific|llamchr.elpi|success||||
+chr_even_odd|elpi_specific|even-odd.elpi|output|regex|-no-tc||needs -trace-on JSON output
+w|elpi_specific|w.elpi|success||||
+w_legacy|elpi_specific|w_legacy.elpi|success||-legacy-parser||
+uvar_keyword|elpi_specific|uvar_chr.elpi|success||||
+polymorphic_variants|elpi_specific|polymorphic_variants.elpi|success||||
+impl_order|elpi_specific|ctx_loading.elpi|success||||
+list_as_conj|elpi_specific|list_as_conj.elpi|success||||
+spilling_lam|elpi_specific|spill_lam.elpi|success||||
+spilling_impl|elpi_specific|spill_impl.elpi|success||||
+spilling_and|elpi_specific|spill_and.elpi|success||||
+block|elpi_specific|block.elpi|failure||||
+elpi_only_llam|elpi_specific|elpi_only_llam.elpi|failure||||
+hollight|elpi_specific|hollight.elpi|failure-output|regex|||
+hollight_legacy|elpi_specific|hollight_legacy.elpi|failure||-legacy-parser||
+asclause|elpi_specific|asclause.elpi|success||||
+elpi-checker|elpi_specific|elpi-checker-copy.elpi|success||||
+elpi2html|elpi_specific|elpi2html-copy.elpi|success||||
+same_term|elpi_specific|same_term.elpi|success||||
+list_comma|elpi_specific|list_comma.elpi|success||||
+heap_discard|elpi_specific|heap_discard.elpi|success||||
+accumulate_twice1|elpi_specific|accumulate_twice1.elpi|failure||||
+accumulate_twice2|elpi_specific|accumulate_twice2.elpi|failure||||
+CHR_no_clique|elpi_specific|chr_not_clique.elpi|failure||||
+quote_syntax|elpi_specific|quote_syntax.elpi|output|regex|||
+var|elpi_specific|var.elpi|success||||
+hyp_uvar|elpi_specific|hyp_uvar.elpi|success||||
+trailing_comment|elpi_specific|end_comment.elpi|success||||
+variadic_declare_constraints|elpi_specific|variadic_declare_constraints.elpi|success||||
+notation_error|elpi_specific|notation_error.elpi|failure-output|regex|||
+printer|elpi_specific|printer.elpi|output|fixed|-no-tc||
+IO_COLON|elpi_specific|io_colon.elpi|success||||
+graft_replace_ok|elpi_specific|graft_replace_ok.elpi|success||||
+graft_replace_err|elpi_specific|graft_replace_err.elpi|failure-output|regex|||
+trace-browser|elpi_specific|trace.elpi|success||-no-tc||needs -trace-on JSON output
+trace-browser2|elpi_specific|trace2.elpi|success||-no-tc||needs -trace-on JSON output
+trace-browser3|elpi_specific|trace3.elpi|success||-no-tc||needs -trace-on JSON output
+trace-browser4|elpi_specific|trace4.elpi|success||-no-tc||needs -trace-on JSON output
+trace-browser-chr|elpi_specific|trace_chr.elpi|success||-no-tc||needs -trace-on JSON output
+trace-browser-findall|elpi_specific|trace_findall.elpi|success||-no-tc||needs -trace-on JSON output
+trace-browser-cut|elpi_specific|trace_cut.elpi|success||-no-tc||needs -trace-on JSON output
+bad_index|elpi_specific|bad_index.elpi|failure-output|regex|||
+trace-browser-w|elpi_specific|trace-w/main.elpi|success||-no-tc||needs -trace-on JSON output
+crypt|performance_FO|crypt.mod|success||||
+queens|performance_FO|queens.elpi|success||||
+rev14|performance_FO|rev14.elpi|success||||
+mu|performance_FO|mu.mod|success||||
+zebra|performance_FO|zebra.elpi|success||||
+fast_mu|performance_FO|fast_mu.mod|success||||
+rev|performance_FO|rev.elpi|success||||
+ackermann|performance_FO|ackermann.elpi|success||||
+index2|performance_FO|index2.elpi|success||||
+deep_index|performance_FO|deep_indexing.elpi|success||||
+map (rbtree)|performance_FO|map.elpi|success||||
+map (defined list)|performance_FO|map_list.elpi|success||||
+map (builtin list)|performance_FO|map_list_opt.elpi|success||||
+map_ho|performance_FO|map_ho.elpi|success||||
+set|performance_FO|set.elpi|success||||
+set_ho|performance_FO|set_ho.elpi|success||||
+dt|performance_FO|dt.elpi|success||||
+dt_off|performance_FO|dt_off.elpi|success||||
+grundlagen|performance_HO|helena_elpi/ld3_engine.elpi|success||||large source not vendored (set UPSTREAM_SOURCES to the full tests/sources)
+lyp|performance_HO|lyp/lyp_engine.elpi|success||||large source not vendored (set UPSTREAM_SOURCES to the full tests/sources)
+cbv|performance_HO|reduce_cbv.elpi|success||||
+cbn|performance_HO|reduce_cbn.elpi|success||||
+lambda3|performance_HO|lambda3.elpi|success||||

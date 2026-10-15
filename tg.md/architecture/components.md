@@ -328,3 +328,13 @@ This is the one component with working code today: its `implements` and `verifie
 - motivated_by:: [[constraints#Oracle is ELPI 1.18]]
 - motivated_by:: [[decisions#ELPI 1.18 dialect]]
 - introduced_by:: [[changes#add-elpi-core]]
+
+## Upstream compatibility suite
+
+Runs ELPI 1.18's own test programs, copied under `tests/upstream/`, on `lean-elpi` and judges each by upstream's rule: exit 0 is success unless the registry expects failure or an output pattern.
+
+`manifest.tsv` is generated from upstream's `tests/suite/*.ml` registry by `extract.py` (name, category, source, expectation, flags, stdin). `run.sh [lean|oracle]` runs it; `oracle` mode runs the real ELPI and must pass everything, which proves the copy and the runner. Failing tests are registered with their first error in `known-failures.md` and reported as `known`, or `stale` once they pass. Trace-format tests, performance categories and the large corpora (set `UPSTREAM_SOURCES`) are skipped. The copied sources are LGPL-2.1 (`LICENSE-ELPI`).
+
+- module:: tests/upstream
+- depends_on:: [[components#Conformance harness]]
+- motivated_by:: [[decisions#ELPI 1.18 dialect]]
