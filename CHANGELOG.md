@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 — 2026-10-15
 
 ### Added
 - Benchmark harness `tests/bench/run.py` (LeanElpi, ELPI 1.18 and Teyjus on ELPI's performance programs), its results, and the blog posts "How compatible and how fast is LeanElpi?" and "Why LeanElpi was 30 times slower than ELPI, and what fixed it".

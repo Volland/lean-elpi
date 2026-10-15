@@ -1,6 +1,6 @@
 {
   "name": "@lean-elpi/leanelpi",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Node.js bindings for LeanElpi, the ELPI dialect of λProlog implemented in Lean 4",
   "main": "index.js",
   "types": "index.d.ts",
@@ -14,9 +14,9 @@
   "engines": { "node": ">=18" },
   "dependencies": { "koffi": "^2.9.0" },
   "optionalDependencies": {
-    "@lean-elpi/leanelpi-darwin-arm64": "0.3.0",
-    "@lean-elpi/leanelpi-darwin-x64": "0.3.0",
-    "@lean-elpi/leanelpi-linux-arm64": "0.3.0",
-    "@lean-elpi/leanelpi-linux-x64": "0.3.0"
+    "@lean-elpi/leanelpi-darwin-arm64": "0.3.1",
+    "@lean-elpi/leanelpi-darwin-x64": "0.3.1",
+    "@lean-elpi/leanelpi-linux-arm64": "0.3.1",
+    "@lean-elpi/leanelpi-linux-x64": "0.3.1"
   }
 }

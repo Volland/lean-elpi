@@ -8,7 +8,7 @@ summary: Profiling the LeanElpi engine found three specific costs, not a Lean li
 
 [The first benchmark](/blog/compatibility-and-performance/) put LeanElpi 0.3.0 at 4 to 142 times slower than ELPI, with memory use in gigabytes. We assumed that was the price of a persistent data structure in Lean, as the design paper had warned, and that the fix would be a large redesign. Profiling said otherwise. Three specific costs explained almost all of it, and each had a small fix. This article walks through them, because two are general lessons about unification and one is a general lesson about Lean.
 
-The numbers below are for the development tree after the fixes, which is not yet a release. The conformance results did not change: 38 of 40 corpus programs and 43 of 114 upstream tests, the same programs as before.
+The numbers below are for release 0.3.1, which contains the fixes. The conformance results did not change: 38 of 40 corpus programs and 43 of 114 upstream tests, the same programs as before.
 
 ## Result
 
@@ -112,4 +112,4 @@ tests/conformance/run.sh && tests/upstream/run.sh lean # compatibility is unchan
 lake test                                              # includes tests/Core/Scaling.lean
 ```
 
-The raw results are in `tests/bench/results/`: `2026-10-15.json` for 0.3.0 and `2026-10-15-optimized.json` and `2026-10-15-rerun.json` for this tree. Issues and faster ideas are welcome on [GitHub](https://github.com/Volland/lean-elpi/issues).
+The raw results are in `tests/bench/results/`: `2026-10-15.json` for 0.3.0 and `2026-10-15-optimized.json` and `2026-10-15-rerun.json` for 0.3.1. Issues and faster ideas are welcome on [GitHub](https://github.com/Volland/lean-elpi/issues).
