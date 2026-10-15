@@ -22,6 +22,14 @@ instance : Output IO := ⟨fun s => IO.print s⟩
 instance : Output Id := ⟨fun _ => pure ()⟩
 instance {ρ : Type} : Output (StateM ρ) := ⟨fun _ => pure ()⟩
 
+/-- Seconds on a monotonic clock. Reading a clock is not pure; `salt` (any value that changes
+between calls) keeps the compiler from evaluating it once and sharing the result. -/
+@[noinline] unsafe def clockSecondsUnsafe (salt : Nat) : Float :=
+  unsafeBaseIO (do let t ← IO.monoNanosNow; pure ((t + salt - salt).toFloat / 1000000000.0))
+
+@[implemented_by clockSecondsUnsafe]
+opaque clockSeconds (salt : Nat) : Float
+
 /-- Signature of a builtin predicate: name, argument modes and type. -/
 structure BuiltinSig where
   name : String
@@ -416,6 +424,8 @@ def core (m : Type → Type) [Monad m] [Output m] : List (Builtin m) :=
         let ps : Print.PS := { syms := c.syms, store := c.store }
         let (s, ps') := (Print.pp args[0]! c.depth 0 true).run ps
         .alts ps'.store (.cons #[args[0]!, .lit (.str s)] (Thunk.mk fun _ => .nil)) },
+    { sig := sig "gettimeofday" [.o]
+      run := fun c _ => pure' (one c #[.lit (.float (clockSeconds c.store.nextVar))]) },
     { sig := sig "halt" []
       run := fun _ _ => pure' (.error "halt") },
     { sig := sig "rex_match" [.i, .i]

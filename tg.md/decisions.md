@@ -264,13 +264,14 @@ Where a scenario in the M1 specs disagrees with what the ELPI 1.18 oracle does, 
 
 ## Undeclared constants are an error only where the type is known
 
-An undeclared constant is reported when it is used where a concrete type is expected or as the head of a goal; elsewhere it is treated as implicitly declared, as the oracle (which only warns) and the corpus require.
+An undeclared constant is an error in a program that declares types of its own, and a warning in one that declares none, as the oracle (which only warns) and the corpus require.
 
-**Context.** The spec asks for an error on an undeclared constant, yet the oracle accepts `main :- …` and untyped data such as `p a 1.` with warnings only.
+**Context.** The spec asks for an error on an undeclared constant, yet the oracle accepts `main :- …` and untyped data such as `p a 1.` or `zebra`'s `nil` with warnings only. The first rule (an error wherever the type is known) still rejected `nil` in a list and the typed uses of undeclared goals that upstream programs contain.
 
-**Decision.** A constant with no declaration and no clauses is an error when the surrounding type is not a bare variable (`pred p i:int. p foo.`) or when it heads a goal (`bar X` outside the namespace that defines `foo.bar`). A predicate defined by clauses counts as declared.
+**Decision.** A program is untyped when it declares no `kind`, `type` or `pred` of its own (the libraries it loads do not count). In an untyped program an undeclared constant is implicitly declared and reported as a warning, which the command-line tool prints on standard error with the hint to pass `--lean-env` when the name may be a Lean builtin. In a typed program a constant with no declaration and no clauses is an error when the surrounding type is known (`pred p i:int. p foo.`). A predicate defined by clauses counts as declared.
 
-**Consequences.** Programs that rely on untyped constants still load; ill-typed uses of declared predicates are rejected at load time with the position.
+**Consequences.** Untyped upstream programs load and run; ill-typed uses in typed programs are still rejected at load time with the position. The test of a typed program for a Lean builtin is a warning plus a runtime failure.
+
 
 - status:: accepted
 - motivated_by:: [[decisions#ELPI 1.18 dialect]]

@@ -14,7 +14,15 @@ package «lean-elpi» where
   versionTags := .startsWith "v"
   leanOptions := #[⟨`autoImplicit, false⟩]
 
-@[default_target] lean_lib Elpi where precompileModules := true
+/-- The ELPI sources that `Elpi.Std` embeds with `include_str`. Lake does not see those files as
+inputs of the module, so without this a change to `lib/elpi/*.elpi` leaves a stale library. -/
+input_dir elpiLibrary where
+  path := "lib/elpi"
+  text := true
+
+@[default_target] lean_lib Elpi where
+  precompileModules := true
+  needs := #[elpiLibrary]
 
 lean_lib Tests where
   srcDir := "tests"

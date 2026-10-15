@@ -170,6 +170,8 @@ def checkSignature (sig : Signature) : Decl → Except TypeError Signature
 structure TC where
   subst : Array (Option Ty) := #[]
   errors : Array TypeError := #[]
+  /-- Undeclared constants of an untyped program: accepted, as the oracle does, but reported. -/
+  warnings : Array TypeError := #[]
   /-- Types of clause variables of the clause being checked. -/
   vars : Std.HashMap String Ty := {}
   /-- Types of untyped but defined constants. -/
@@ -238,6 +240,10 @@ structure Env where
   sig : Signature
   /-- Constants that have clauses, hence are implicitly declared. -/
   defined : Std.HashSet String
+  /-- The program declares kinds, types or predicates of its own. Only then is an undeclared
+  constant an error; an untyped program is checked as the oracle does, with the constant
+  implicitly declared. -/
+  typed : Bool := true
   bound : List (String × Ty) := []
 
 def report (p : Pos) (msg : String) : TCM Unit :=
@@ -361,11 +367,12 @@ partial def constType (env : Env) (n : String) (p : Pos) (expected : Ty)
       modify fun s => { s with implicit := s.implicit.insert n ty }
       -- an undeclared constant with no clauses used where the type is known is an error
       if !(env.defined.contains n) then
-        let isHead := nargs.isSome
         let concrete := !(← isMeta expected)
-        if concrete || isHead then
-          if concrete then
-            report p s!"undeclared constant '{n}'"
+        -- in a program that declares types of its own an undeclared constant is an error; in an
+        -- untyped one it is implicitly declared and only reported, as the oracle does
+        if concrete then
+          if env.typed then report p s!"undeclared constant '{n}'"
+          else modify fun s => { s with warnings := s.warnings.push { pos := p, msg := s!"undeclared constant '{n}' (assumed untyped)" } }
       return ty
 
 partial def checkConst (env : Env) (n : String) (p : Pos) (expected : Ty) : TCM Unit := do
@@ -409,10 +416,11 @@ partial def clauseHead : STm → Option String
 all errors; `none` is returned when any exists. -/
 -- @tg: implements:: [[openspec:elpi-typechecker#Load-time type errors with positions]]
 def checkProgram (sig : Signature) (clauses : List STm) (query : Option STm := none)
-    (known : Std.HashSet String := {}) : Except (List TypeError) Unit :=
+    (known : Std.HashSet String := {}) (typed : Bool := true) :
+    Except (List TypeError) (List TypeError) :=
   let defined : Std.HashSet String :=
     clauses.foldl (fun s c => match clauseHead c with | some n => s.insert n | none => s) known
-  let env : Env := { sig, defined }
+  let env : Env := { sig, defined, typed }
   let act : TCM Unit := do
     for c in clauses do
       checkClause env c
@@ -420,7 +428,7 @@ def checkProgram (sig : Signature) (clauses : List STm) (query : Option STm := n
     | some q => checkClause env q
     | none => pure ()
   let (_, st) := act.run {}
-  if st.errors.isEmpty then .ok () else .error st.errors.toList
+  if st.errors.isEmpty then .ok st.warnings.toList else .error st.errors.toList
 
 end Typecheck
 end Elpi

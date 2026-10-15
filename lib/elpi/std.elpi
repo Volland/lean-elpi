@@ -186,93 +186,168 @@ std.string.concat _ [] "".
 std.string.concat _ [S] S :- !.
 std.string.concat Sep [S|SS] R :- std.string.concat Sep SS R1, R is S ^ Sep ^ R1.
 
-% ---- ordered maps (unbalanced binary trees) -------------------------------
+% ---- time -------------------------------------------------------------------
+
+% Wall-clock time (in seconds) taken by a goal.
+pred std.time i:prop, o:float.
+std.time G T :- gettimeofday T0, G, gettimeofday T1, T is T1 - T0.
+
+% ---- ordered maps (AVL trees) ------------------------------------------------
 
 kind cmp type.
 type lt, eq, gt cmp.
 kind unit type.
 type unit unit.
+
+% A map carries its comparison function; the tree underneath is height-balanced.
 kind std.map type -> type -> type.
-type std.map.node std.map K V -> K -> V -> std.map K V -> std.map K V.
-type std.map.leaf std.map K V.
-kind std.map.t type -> type -> type.
-type std.map.map (K -> K -> cmp -> prop) -> std.map K V -> std.map.t K V.
+kind std.map.tree type -> type -> type.
+type std.map.map (K -> K -> cmp -> prop) -> std.map.tree K V -> std.map K V.
+type std.map.leaf std.map.tree K V.
+type std.map.node std.map.tree K V -> K -> V -> std.map.tree K V -> int -> std.map.tree K V.
 
 pred cmp_term i:A, i:A, o:cmp.
 cmp_term X Y lt :- X < Y, !.
 cmp_term X Y eq :- X == Y, !.
 cmp_term _ _ gt.
 
-pred std.map.make i:(K -> K -> cmp -> prop), o:std.map.t K V.
+pred std.map.make i:(K -> K -> cmp -> prop), o:std.map K V.
 std.map.make Cmp (std.map.map Cmp std.map.leaf).
 
-pred std.map.add i:K, i:V, i:std.map.t K V, o:std.map.t K V.
+pred std.map.add i:K, i:V, i:std.map K V, o:std.map K V.
 std.map.add K V (std.map.map Cmp T) (std.map.map Cmp T1) :- std.map.private.add Cmp K V T T1.
 
-pred std.map.private.add i:(K -> K -> cmp -> prop), i:K, i:V, i:std.map K V, o:std.map K V.
-std.map.private.add _ K V std.map.leaf (std.map.node std.map.leaf K V std.map.leaf).
-std.map.private.add Cmp K V (std.map.node L K1 V1 R) T :-
+pred std.map.find i:K, i:std.map K V, o:V.
+std.map.find K (std.map.map Cmp T) V :- std.map.private.find Cmp K T V.
+
+pred std.map.mem i:K, i:std.map K V.
+std.map.mem K M :- std.map.find K M _.
+
+pred std.map.remove i:K, i:std.map K V, o:std.map K V.
+std.map.remove K (std.map.map Cmp T) (std.map.map Cmp T1) :- std.map.private.remove Cmp K T T1.
+
+% The bindings in increasing key order.
+pred std.map.bindings i:std.map K V, o:list (pair K V).
+std.map.bindings (std.map.map _ T) L :- std.map.private.bindings T [] L.
+
+% Apply F to every key and value, giving a map with the same keys.
+pred std.map.map-values i:std.map K V, i:(K -> V -> W -> prop), o:std.map K W.
+std.map.map-values (std.map.map Cmp T) F (std.map.map Cmp T1) :- std.map.private.map-values F T T1.
+
+pred std.map.private.height i:std.map.tree K V, o:int.
+std.map.private.height std.map.leaf 0.
+std.map.private.height (std.map.node _ _ _ _ H) H.
+
+pred std.map.private.max i:int, i:int, o:int.
+std.map.private.max A B A :- A >= B, !.
+std.map.private.max _ B B.
+
+% A node over two subtrees, with its height.
+pred std.map.private.mk i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.mk L K V R (std.map.node L K V R H) :-
+  std.map.private.height L HL, std.map.private.height R HR,
+  std.map.private.max HL HR M, H is M + 1.
+
+% A node over two subtrees whose heights differ by at most two, rebalanced.
+pred std.map.private.bal i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.bal L K V R T :-
+  std.map.private.height L HL, std.map.private.height R HR,
+  D is HL - HR, E is HR - HL,
+  std.map.private.bal-aux D E L K V R T.
+
+pred std.map.private.bal-aux i:int, i:int, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.bal-aux D _ L K V R T :- D > 1, !, std.map.private.rot-right L K V R T.
+std.map.private.bal-aux _ E L K V R T :- E > 1, !, std.map.private.rot-left L K V R T.
+std.map.private.bal-aux _ _ L K V R T :- std.map.private.mk L K V R T.
+
+% The left subtree is two taller: one rotation, or two when its right side is the taller.
+pred std.map.private.rot-right i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.rot-right (std.map.node LL LK LV LR _) K V R T :-
+  std.map.private.height LL HLL, std.map.private.height LR HLR,
+  std.map.private.rot-right-aux HLL HLR LL LK LV LR K V R T.
+
+pred std.map.private.rot-right-aux i:int, i:int, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.rot-right-aux HLL HLR LL LK LV LR K V R T :- HLL >= HLR, !,
+  std.map.private.mk LR K V R R1, std.map.private.mk LL LK LV R1 T.
+std.map.private.rot-right-aux _ _ LL LK LV (std.map.node LRL LRK LRV LRR _) K V R T :-
+  std.map.private.mk LL LK LV LRL A, std.map.private.mk LRR K V R B,
+  std.map.private.mk A LRK LRV B T.
+
+pred std.map.private.rot-left i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.rot-left L K V (std.map.node RL RK RV RR _) T :-
+  std.map.private.height RL HRL, std.map.private.height RR HRR,
+  std.map.private.rot-left-aux HRL HRR L K V RL RK RV RR T.
+
+pred std.map.private.rot-left-aux i:int, i:int, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.rot-left-aux HRL HRR L K V RL RK RV RR T :- HRR >= HRL, !,
+  std.map.private.mk L K V RL L1, std.map.private.mk L1 RK RV RR T.
+std.map.private.rot-left-aux _ _ L K V (std.map.node RLL RLK RLV RLR _) RK RV RR T :-
+  std.map.private.mk L K V RLL A, std.map.private.mk RLR RK RV RR B,
+  std.map.private.mk A RLK RLV B T.
+
+pred std.map.private.add i:(K -> K -> cmp -> prop), i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.add _ K V std.map.leaf (std.map.node std.map.leaf K V std.map.leaf 1).
+std.map.private.add Cmp K V (std.map.node L K1 V1 R _) T :-
   Cmp K K1 O,
   std.map.private.add-aux O Cmp K V L K1 V1 R T.
 
-pred std.map.private.add-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:V, i:std.map K V, i:K, i:V, i:std.map K V, o:std.map K V.
-std.map.private.add-aux lt Cmp K V L K1 V1 R (std.map.node L1 K1 V1 R) :- std.map.private.add Cmp K V L L1.
-std.map.private.add-aux eq _ K V L _ _ R (std.map.node L K V R).
-std.map.private.add-aux gt Cmp K V L K1 V1 R (std.map.node L K1 V1 R1) :- std.map.private.add Cmp K V R R1.
+pred std.map.private.add-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:V, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.add-aux lt Cmp K V L K1 V1 R T :-
+  std.map.private.add Cmp K V L L1, std.map.private.bal L1 K1 V1 R T.
+std.map.private.add-aux eq _ K V L _ _ R T :- std.map.private.mk L K V R T.
+std.map.private.add-aux gt Cmp K V L K1 V1 R T :-
+  std.map.private.add Cmp K V R R1, std.map.private.bal L K1 V1 R1 T.
 
-pred std.map.find i:K, i:std.map.t K V, o:V.
-std.map.find K (std.map.map Cmp T) V :- std.map.private.find Cmp K T V.
-
-pred std.map.private.find i:(K -> K -> cmp -> prop), i:K, i:std.map K V, o:V.
-std.map.private.find Cmp K (std.map.node L K1 V1 R) V :-
+pred std.map.private.find i:(K -> K -> cmp -> prop), i:K, i:std.map.tree K V, o:V.
+std.map.private.find Cmp K (std.map.node L K1 V1 R _) V :-
   Cmp K K1 O,
   std.map.private.find-aux O Cmp K L V1 R V.
 
-pred std.map.private.find-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:std.map K V, i:V, i:std.map K V, o:V.
+pred std.map.private.find-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:std.map.tree K V, i:V, i:std.map.tree K V, o:V.
 std.map.private.find-aux lt Cmp K L _ _ V :- std.map.private.find Cmp K L V.
 std.map.private.find-aux eq _ _ _ V _ V.
 std.map.private.find-aux gt Cmp K _ _ R V :- std.map.private.find Cmp K R V.
 
-pred std.map.mem i:K, i:std.map.t K V.
-std.map.mem K M :- std.map.find K M _.
-
-pred std.map.bindings i:std.map.t K V, o:list (pair K V).
-std.map.bindings (std.map.map _ T) L :- std.map.private.bindings T L.
-
-pred std.map.private.bindings i:std.map K V, o:list (pair K V).
-std.map.private.bindings std.map.leaf [].
-std.map.private.bindings (std.map.node L K V R) B :-
-  std.map.private.bindings L BL,
-  std.map.private.bindings R BR,
-  std.append BL [pr K V|BR] B.
-
-pred std.map.remove i:K, i:std.map.t K V, o:std.map.t K V.
-std.map.remove K (std.map.map Cmp T) (std.map.map Cmp T1) :-
-  std.map.private.bindings T B,
-  std.map.private.remove-binding Cmp K B B1,
-  std.map.private.rebuild Cmp B1 std.map.leaf T1.
-
-pred std.map.private.remove-binding i:(K -> K -> cmp -> prop), i:K, i:list (pair K V), o:list (pair K V).
-std.map.private.remove-binding _ _ [] [].
-std.map.private.remove-binding Cmp K [pr K1 V1|L] R :-
+pred std.map.private.remove i:(K -> K -> cmp -> prop), i:K, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.remove _ _ std.map.leaf std.map.leaf.
+std.map.private.remove Cmp K (std.map.node L K1 V1 R _) T :-
   Cmp K K1 O,
-  std.map.private.remove-aux O Cmp K K1 V1 L R.
+  std.map.private.remove-aux O Cmp K L K1 V1 R T.
 
-pred std.map.private.remove-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:K, i:V, i:list (pair K V), o:list (pair K V).
-std.map.private.remove-aux eq _ _ _ _ L L.
-std.map.private.remove-aux lt _ _ K1 V1 L [pr K1 V1|L].
-std.map.private.remove-aux gt Cmp K K1 V1 L [pr K1 V1|R] :- std.map.private.remove-binding Cmp K L R.
+pred std.map.private.remove-aux i:cmp, i:(K -> K -> cmp -> prop), i:K, i:std.map.tree K V, i:K, i:V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.remove-aux lt Cmp K L K1 V1 R T :-
+  std.map.private.remove Cmp K L L1, std.map.private.bal L1 K1 V1 R T.
+std.map.private.remove-aux eq _ _ L _ _ R T :- std.map.private.join L R T.
+std.map.private.remove-aux gt Cmp K L K1 V1 R T :-
+  std.map.private.remove Cmp K R R1, std.map.private.bal L K1 V1 R1 T.
 
-pred std.map.private.rebuild i:(K -> K -> cmp -> prop), i:list (pair K V), i:std.map K V, o:std.map K V.
-std.map.private.rebuild _ [] T T.
-std.map.private.rebuild Cmp [pr K V|L] T R :-
-  std.map.private.add Cmp K V T T1,
-  std.map.private.rebuild Cmp L T1 R.
+% The two subtrees of a removed node, joined: the smallest binding of the right one moves up.
+pred std.map.private.join i:std.map.tree K V, i:std.map.tree K V, o:std.map.tree K V.
+std.map.private.join std.map.leaf R R :- !.
+std.map.private.join L std.map.leaf L :- !.
+std.map.private.join L R T :-
+  std.map.private.pop-min R MK MV R1, std.map.private.bal L MK MV R1 T.
 
-% ---- sets ------------------------------------------------------------------
+pred std.map.private.pop-min i:std.map.tree K V, o:K, o:V, o:std.map.tree K V.
+std.map.private.pop-min (std.map.node std.map.leaf K V R _) K V R :- !.
+std.map.private.pop-min (std.map.node L K V R _) MK MV T :-
+  std.map.private.pop-min L MK MV L1, std.map.private.bal L1 K V R T.
+
+pred std.map.private.bindings i:std.map.tree K V, i:list (pair K V), o:list (pair K V).
+std.map.private.bindings std.map.leaf A A.
+std.map.private.bindings (std.map.node L K V R _) A B :-
+  std.map.private.bindings R A A1,
+  std.map.private.bindings L [pr K V|A1] B.
+
+pred std.map.private.map-values i:(K -> V -> W -> prop), i:std.map.tree K V, o:std.map.tree K W.
+std.map.private.map-values _ std.map.leaf std.map.leaf.
+std.map.private.map-values F (std.map.node L K V R H) (std.map.node L1 K W R1 H) :-
+  std.map.private.map-values F L L1, F K V W, std.map.private.map-values F R R1.
+
+% ---- sets -------------------------------------------------------------------
 
 kind std.set type -> type.
-type std.set.set std.map.t K unit -> std.set K.
+type std.set.set std.map K unit -> std.set K.
 
 pred std.set.make i:(K -> K -> cmp -> prop), o:std.set K.
 std.set.make Cmp (std.set.set M) :- std.map.make Cmp M.
@@ -283,6 +358,7 @@ std.set.add K (std.set.set M) (std.set.set M1) :- std.map.add K unit M M1.
 pred std.set.mem i:K, i:std.set K.
 std.set.mem K (std.set.set M) :- std.map.find K M _.
 
+% The elements in increasing order.
 pred std.set.elements i:std.set K, o:list K.
 std.set.elements (std.set.set M) L :- std.map.bindings M B, std.set.private.keys B L.
 
@@ -295,3 +371,64 @@ std.set.remove K (std.set.set M) (std.set.set M1) :- std.map.remove K M M1.
 
 pred std.set.cardinal i:std.set K, o:int.
 std.set.cardinal S N :- std.set.elements S L, std.length L N.
+
+% The elements that satisfy P, in a set ordered like S.
+pred std.set.filter i:std.set K, i:(K -> prop), o:std.set K.
+std.set.filter S P S1 :-
+  S = std.set.set (std.map.map Cmp _),
+  std.set.elements S L, std.filter L P L1,
+  std.set.make Cmp E, std.fold L1 E std.set.add S1.
+
+% ---- maps and sets with integer keys -------------------------------------------
+
+typeabbrev (std.int.map V) (std.map int V).
+typeabbrev std.int.set (std.set int).
+
+pred std.int.map.empty o:std.int.map V.
+std.int.map.empty M :- std.map.make cmp_term M.
+
+pred std.int.map.add i:int, i:V, i:std.int.map V, o:std.int.map V.
+std.int.map.add K V M M1 :- std.map.add K V M M1.
+
+pred std.int.map.find i:int, i:std.int.map V, o:V.
+std.int.map.find K M V :- std.map.find K M V.
+
+pred std.int.map.mem i:int, i:std.int.map V.
+std.int.map.mem K M :- std.map.mem K M.
+
+pred std.int.map.remove i:int, i:std.int.map V, o:std.int.map V.
+std.int.map.remove K M M1 :- std.map.remove K M M1.
+
+pred std.int.map.bindings i:std.int.map V, o:list (pair int V).
+std.int.map.bindings M L :- std.map.bindings M L.
+
+% A map with the same keys, where F K V W gives the new value W.
+pred std.int.map.map i:std.int.map V, i:(int -> V -> W -> prop), o:std.int.map W.
+std.int.map.map M F M1 :- std.map.map-values M F M1.
+
+pred std.int.set.empty o:std.int.set.
+std.int.set.empty S :- std.set.make cmp_term S.
+
+pred std.int.set.add i:int, i:std.int.set, o:std.int.set.
+std.int.set.add K S S1 :- std.set.add K S S1.
+
+pred std.int.set.mem i:int, i:std.int.set.
+std.int.set.mem K S :- std.set.mem K S.
+
+pred std.int.set.remove i:int, i:std.int.set, o:std.int.set.
+std.int.set.remove K S S1 :- std.set.remove K S S1.
+
+pred std.int.set.elements i:std.int.set, o:list int.
+std.int.set.elements S L :- std.set.elements S L.
+
+pred std.int.set.cardinal i:std.int.set, o:int.
+std.int.set.cardinal S N :- std.set.cardinal S N.
+
+pred std.int.set.filter i:std.int.set, i:(int -> prop), o:std.int.set.
+std.int.set.filter S P S1 :- std.set.filter S P S1.
+
+% The set of the images of the elements: F X Y relates an element to its image.
+pred std.int.set.map i:std.int.set, i:(int -> int -> prop), o:std.int.set.
+std.int.set.map S F S1 :-
+  std.set.elements S L, std.map L F L1,
+  std.int.set.empty E, std.fold L1 E std.int.set.add S1.

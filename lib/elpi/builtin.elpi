@@ -84,6 +84,7 @@ type ceil float -> int.
 type print variadic any prop.
 pred term_to_string i:A, o:string.
 pred halt.
+pred gettimeofday o:float.
 type size string -> int.
 type substring string -> int -> int -> string.
 type int_to_string int -> string.

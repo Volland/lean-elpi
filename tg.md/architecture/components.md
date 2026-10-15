@@ -29,6 +29,8 @@ Lexer and parser for ELPI 1.18 source, producing clauses and declarations with s
 
 Positions are mapped through an offset table so inline sources embedded in Lean files report errors at the right Lean location.
 
+Three syntax forms are rewritten on the token stream before parsing, so the parser itself stays small: `macro @name X :- body.` definitions and their uses (`expandMacros`), and `pi x y\ body` / `sigma x y\ body`, which stand for nested single-name binders (`expandBinders`). The lexer also accepts blanks before a binder's backslash (not after `rule`, where a spaced backslash separates CHR heads), a trailing comma in a list, and an `:index` attribute before a declaration.
+
 - module:: Elpi.Core.Parser
 - milestone:: M1
 - depends_on:: [[components#Term store]]
@@ -38,6 +40,8 @@ Positions are mapped through an offset table so inline sources embedded in Lean 
 ## Type checker
 
 Load-time checker for `kind`, `type`, `pred` with modes, prenex polymorphism and `typeabbrev`. Source: `Elpi/Core/Typecheck.lean`.
+
+A program that declares no kinds, types or predicates of its own is checked as the oracle checks it: an undeclared constant is implicitly declared and reported as a warning, which the CLI prints. Once a program declares types, an undeclared constant is an error ([[decisions#Undeclared constants are an error only where the type is known]]).
 
 - module:: Elpi.Core.Typecheck
 - milestone:: M1
@@ -147,6 +151,8 @@ Environment extension and attributes (`@[elpi_builtin]`, `@[elpi_constraint_hand
 ## Standard library
 
 The clean-room `std` library: lists, maps, sets, strings, `findall`, `spy`, `assert!`, with upstream predicate names. Source: `Elpi/Std/Std.lean` and `lib/elpi/std.elpi`.
+
+`std.map K V` is a height-balanced (AVL) tree that carries its comparison function, `std.set` is a map to `unit`, and `std.int.map` / `std.int.set` fix the key type; all are ELPI source, written from the textbook algorithm. `std.time G T` measures a goal with the `gettimeofday` builtin. The embedded files are inputs of the library in the lakefile, so editing `lib/elpi` rebuilds it.
 
 - module:: Elpi.Std.Std
 - milestone:: M1

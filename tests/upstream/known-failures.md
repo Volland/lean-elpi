@@ -52,17 +52,9 @@ typeabbrv12.elpi:4:2: "x" has type string but is used with type (list int)
 
 conj2.elpi:4:19: expected ']' but found '&'
 
-## eta
-
-eta.elpi:3:0: 'macro' is unsupported in this milestone
-
 ## impl2
 
 impl2.elpi:3:42: undeclared constant 'r'
-
-## patternunif
-
-patternunif.elpi:2:20: undeclared constant 'r'
 
 ## llam
 
@@ -71,18 +63,6 @@ llam.elpi:41:53: undeclared constant 'f'
 ## restriction3
 
 restriction3.elpi:2:0: 'mode' is unsupported in this milestone
-
-## restriction4
-
-restriction4.elpi:2:10: sigma is applied to 2 arguments but its type (?4 -> prop) -> prop takes 1
-
-## restriction5
-
-restriction5.elpi:2:2: pi is applied to 5 arguments but its type (?1 -> prop) -> prop takes 1
-
-## bug19
-
-GH_issue_19.elpi:3:10: expected ')' but found '\'
 
 ## notation
 
@@ -176,10 +156,6 @@ chrGCD.elpi:1:0: 'mode' is unsupported in this milestone
 
 chr_nokey2.elpi:3:42: undeclared constant 'false'
 
-## chr_sem
-
-chr_sem.elpi:4:27: undeclared constant 'd'
-
 ## chr_ut
 
 llamchr.elpi:1:0: 'mode' is unsupported in this milestone
@@ -191,10 +167,6 @@ w.elpi:18:7: expected '.' but found '==>'
 ## uvar_keyword
 
 uvar_chr.elpi:2:9: unknown type 'term'
-
-## polymorphic_variants
-
-polymorphic_variants.elpi:121:1: undeclared constant 'print_constraints'
 
 ## impl_order
 
@@ -240,10 +212,6 @@ elpi2html-copy.elpi:7:0: 'shorten' is unsupported in this milestone
 
 same_term.elpi:8:2: pi is applied to 2 arguments but its type (?25 -> prop) -> prop takes 1
 
-## list_comma
-
-list_comma.elpi:2:14: term expected, found ']'
-
 ## heap_discard
 
 heap_discard.elpi:5:2: pi is applied to 2 arguments but its type (?15 -> prop) -> prop takes 1
@@ -271,10 +239,6 @@ variadic_declare_constraints.elpi:1:9: unknown type 'tm'
 ## printer
 
 lean-elpi: unknown option '-no-tc'
-
-## IO_COLON
-
-io_colon.elpi:1:15: undeclared constant 'f'
 
 ## graft_replace_ok
 

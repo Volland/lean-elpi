@@ -204,6 +204,9 @@ def main (args : List String) : IO UInt32 := do
         match Program.loadWith sigs "" with
         | .ok p => pure p
         | .error e => IO.eprintln s!"{e}"; return 1
+    -- constants nobody declared (untyped programs): reported, as the oracle does
+    for w in p.warnings do
+      IO.eprintln (envHint s!"warning: {w}")
     let query? : Option String :=
       if let some pred := o.exec then
         some s!"{pred} [{", ".intercalate (o.rest.map quoteArg)}]"

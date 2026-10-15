@@ -186,8 +186,11 @@ partial def lex (file : String) (src : String) : Except ParseError (Array Token)
           j := j + 1
         let s := String.ofList (cs.extract i j).toList
         len := j - i
-        if j < n && cs[j]! == '\\' then
-          tok := .bind s; len := len + 1
+        -- a binder `x\ body` may have blanks between the name and the backslash
+        let mut k := j
+        while k < n && (cs[k]! == ' ' || cs[k]! == '\t') do k := k + 1
+        if k < n && cs[k]! == '\\' then
+          tok := .bind s; len := (k - i) + 1
         else tok := .var s
       else if isIdStart c then
         let mut j := i + 1
@@ -195,8 +198,11 @@ partial def lex (file : String) (src : String) : Except ParseError (Array Token)
           j := j + 1
         let s := String.ofList (cs.extract i j).toList
         len := j - i
-        if j < n && cs[j]! == '\\' then
-          tok := .bind s; len := len + 1
+        -- (not after `rule`, where a spaced backslash separates CHR heads)
+        let mut k := j
+        while k < n && (cs[k]! == ' ' || cs[k]! == '\t') do k := k + 1
+        if k < n && cs[k]! == '\\' && (k == j || s != "rule") then
+          tok := .bind s; len := (k - i) + 1
         else tok := .ident s
       else if c == '{' && i + 1 < n && cs[i+1]! == '{' then
         -- a Lean quotation `{{ … }}`, with nested `{{ … }}` for antiquotations
@@ -400,7 +406,12 @@ partial def parseAtom : PM STm := do
     let mut tail : STm := .const "[]" t.pos
     repeat
       let k ← peek
-      if k.tok == .comma then advance; elems := elems.push (← parseExpr 111)
+      if k.tok == .comma then
+        advance
+        -- a trailing comma before `]` is allowed
+        let after ← peek
+        if after.tok == .rb then advance; break
+        elems := elems.push (← parseExpr 111)
       else if k.tok == .bar then
         advance; tail ← parseExpr 111; expect .rb; break
       else expect .rb; break
@@ -613,7 +624,7 @@ partial def parseDecl : PM Decl := do
       rules := rules.push { kept, removed, guard, body, pos := k.pos }
     expect .rc
     return .constraint preds.toList rules.toList t.pos
-  | .ident "macro" | .ident "shorten" | .ident "external"
+  | .ident "shorten" | .ident "external"
   | .ident "chr" | .ident "mode" =>
     fail t.pos s!"'{tokDesc t.tok}' is unsupported in this milestone"
   | _ =>
@@ -655,19 +666,154 @@ partial def parseDecl : PM Decl := do
         | .ident _ => advance; advance
         | _ => break
       | _ => break
+    -- attributes such as `:index (1)` may also precede a declaration
+    let nx ← peek
+    if nx.tok == .ident "pred" || nx.tok == .ident "type" then
+      return (← parseDecl)
     let c ← parseExpr 0
     expect .dot
     return .clause attrs c t.pos
 end
 
+/-! ### Macros
+
+`macro @name X Y :- body.` defines a text macro: every later `@name a b` is replaced by the
+parenthesised `body` with `X` and `Y` replaced by `a` and `b`. Expansion happens on the token
+stream before parsing, so a macro body can be any term and a macro can use earlier macros. -/
+
+/-- Index just past the argument that starts at `i`: one token, a macro use `@name`, or a
+balanced group. -/
+private partial def argEnd (toks : Array Token) (i : Nat) : Nat :=
+  let rec skip (j depth : Nat) : Nat :=
+    if h : j < toks.size then
+      match toks[j].tok with
+      | .lp | .lb | .lc => skip (j + 1) (depth + 1)
+      | .rp | .rb | .rc => if depth ≤ 1 then j + 1 else skip (j + 1) (depth - 1)
+      | _ => if depth == 0 then j + 1 else skip (j + 1) depth
+    else j
+  termination_by toks.size - j
+  decreasing_by all_goals omega
+  match toks[i]?, toks[i + 1]? with
+  | some { tok := .sym "@", .. }, some { tok := .ident _, space := false, .. } => i + 2
+  | _, _ => skip i 0
+
+/-- A macro: its parameter names and the (already expanded) tokens of its body. -/
+private abbrev Macros := Std.HashMap String (List String × Array Token)
+
+private def mkTok (t : Tok) (like : Token) : Token := { like with tok := t }
+
+/-- The macro name written at `toks[i]` (`@` immediately followed by an identifier). -/
+private def macroNameAt (toks : Array Token) (i : Nat) : Option String :=
+  match toks[i]?, toks[i + 1]? with
+  | some { tok := .sym "@", .. }, some { tok := .ident n, space := false, .. } => some ("@" ++ n)
+  | _, _ => none
+
+/-- Replace macro uses in `toks` (macros are in `ms`). -/
+private partial def substMacros (ms : Macros) (toks : Array Token) : Except ParseError (Array Token) := do
+  let mut out : Array Token := #[]
+  let mut i := 0
+  while i < toks.size do
+    match macroNameAt toks i with
+    | some n =>
+      match ms[n]? with
+      | none => out := out.push toks[i]!; i := i + 1
+      | some (params, body) =>
+        let use := toks[i]!
+        i := i + 2
+        let mut args : Array (Array Token) := #[]
+        for _ in params do
+          if i ≥ toks.size then throw { pos := use.pos, msg := s!"macro '{n}' expects {params.length} arguments" }
+          let e := argEnd toks i
+          -- an argument may itself use a macro
+          args := args.push (← substMacros ms (toks.extract i e))
+          i := e
+        out := out.push (mkTok .lp use)
+        for b in body do
+          match b.tok with
+          | .var v =>
+            match params.findIdx? (· == v) with
+            | some k =>
+              out := out.push (mkTok .lp use)
+              out := out ++ args[k]!
+              out := out.push (mkTok .rp use)
+            | none => out := out.push b
+          | _ => out := out.push b
+        out := out.push (mkTok .rp use)
+    | none => out := out.push toks[i]!; i := i + 1
+  return out
+
+/-- Expand the macros of a token stream, dropping their definitions. -/
+def expandMacros (toks : Array Token) : Except ParseError (Array Token) := do
+  let mut ms : Macros := {}
+  let mut out : Array Token := #[]
+  let mut i := 0
+  while i < toks.size do
+    let t := toks[i]!
+    let atStart := match out.back? with
+      | none => true
+      | some { tok := .dot, .. } | some { tok := .lc, .. } | some { tok := .rc, .. } => true
+      | _ => false
+    if t.tok == .ident "macro" && atStart then
+      let some n := macroNameAt toks (i + 1)
+        | throw { pos := t.pos, msg := "macro name '@name' expected" }
+      i := i + 3
+      let mut params : List String := []
+      while i < toks.size do
+        match toks[i]!.tok with
+        | .var v => params := params ++ [v]; i := i + 1
+        | _ => break
+      unless toks[i]?.map (·.tok) == some (.sym ":-") do
+        throw { pos := t.pos, msg := s!"':-' expected in the definition of macro '{n}'" }
+      i := i + 1
+      let start := i
+      while i < toks.size && toks[i]!.tok != .dot do i := i + 1
+      if i ≥ toks.size then throw { pos := t.pos, msg := s!"'.' expected at the end of macro '{n}'" }
+      let body ← substMacros ms (toks.extract start i)
+      ms := ms.insert n (params, body)
+      i := i + 1
+    else
+      out := out.push t
+      i := i + 1
+  if ms.isEmpty then return out else substMacros ms out
+
+/-- `pi x y z\ body` and `sigma x y\ body` bind several names at once: they stand for
+`pi x\ pi y\ pi z\ body`. Rewritten on the token stream, and only after `pi` or `sigma`, so
+that an application such as `f X Y\ Z` keeps its meaning. -/
+def expandBinders (toks : Array Token) : Array Token := Id.run do
+  let mut out : Array Token := #[]
+  let mut i := 0
+  while i < toks.size do
+    let t := toks[i]!
+    out := out.push t
+    i := i + 1
+    match t.tok with
+    | .ident q =>
+      if q == "pi" || q == "sigma" then
+        -- names up to the binder token that ends the run
+        let mut j := i
+        while j < toks.size && (match toks[j]!.tok with | .ident _ | .var _ => true | _ => false) do
+          j := j + 1
+        match (toks[j]?).map (fun (x : Token) => x.tok) with
+        | some (Tok.bind _) =>
+          if j > i then
+            for k in [i:j] do
+              let n := toks[k]!
+              let nm := match n.tok with | .ident v | .var v => v | _ => ""
+              out := out.push { n with tok := .bind nm }
+              out := out.push { t with pos := n.pos }
+            i := j
+        | _ => pure ()
+    | _ => pure ()
+  return out
+
 def parseProgram (file src : String) : Except ParseError (List Decl) := do
-  let toks ← lex file src
+  let toks := expandBinders (← expandMacros (← lex file src))
   let (ds, _) ← (parseDecls false).run { toks }
   return ds
 
 /-- Parse a single query term (no trailing dot required). -/
 def parseQuery (file src : String) : Except ParseError STm := do
-  let toks ← lex file src
+  let toks := expandBinders (← lex file src)
   let (t, st) ← (do let t ← parseExpr 0
                     let k ← peek
                     if k.tok == .dot then advance

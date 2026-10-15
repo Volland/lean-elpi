@@ -130,28 +130,47 @@ inductive Sol where
   | fail
   | delay
 
+/-- How many nodes `scanClean` examines before it stops looking: a binding to a bigger term is
+accepted without the rest of the scan. The scan is linear in the term, so an accumulator that is
+bound to a list of n elements at every one of n steps would otherwise cost n² (ELPI never scans).
+Every cyclic or out-of-scope binding of an ordinary-sized term is still rejected. -/
+def scanBudget : Nat := 4096
+
+/-- Result of `scanClean` for a term that is not clean (any number above `scanBudget`). -/
+def notClean : Nat := scanBudget + 1
+
 /-- Can `x := t` be assigned as it stands? True when `t` (at depth `d`) mentions neither `x` nor
 a variable of a scope level above `lvl`, so that inversion would return `t` unchanged for a
-variable with an empty spine at its own depth. A read-only scan: no allocation. -/
-partial def scanClean (s : Store) (x : UVarId) (lvl : Nat) (t : Term) (d : Nat) : Bool :=
+variable with an empty spine at its own depth. A read-only scan of at most `scanBudget` nodes,
+without allocation: it returns the budget left, or `notClean`. -/
+partial def scanClean (s : Store) (x : UVarId) (lvl : Nat) (t : Term) (d : Nat) (fuel : Nat) : Nat :=
+  if fuel == 0 then 0 else
   match t with
-  | .const _ | .lit _ | .builtinData _ | .bound _ => true
-  | .lam b => scanClean s x lvl b (d + 1)
-  | .app h as => scanClean s x lvl h d && as.all (scanClean s x lvl · d)
-  | .cvar .. => false
+  | .const _ | .lit _ | .builtinData _ | .bound _ => fuel - 1
+  | .lam b => scanClean s x lvl b (d + 1) (fuel - 1)
+  | .app h as =>
+    let f := scanClean s x lvl h d (fuel - 1)
+    if f > scanBudget then f else scanArr s x lvl as d 0 f
+  | .cvar .. => notClean
   | .uvar y ys =>
-    if y == x then false else
+    if y == x then notClean else
     match s.lookup? y with
-    | none => s.levelOf y ≤ lvl && ys.all (scanClean s x lvl · d)
+    | none => if s.levelOf y ≤ lvl then scanArr s x lvl ys d 0 (fuel - 1) else notClean
     | some v =>
-      if ys.isEmpty then scanClean s x lvl v (s.levelOf y)
-      else scanClean s x lvl (s.deref t d) d
+      if ys.isEmpty then scanClean s x lvl v (s.levelOf y) (fuel - 1)
+      else scanClean s x lvl (s.deref t d) d (fuel - 1)
+where
+  scanArr (s : Store) (x : UVarId) (lvl : Nat) (as : Array Term) (d i : Nat) (fuel : Nat) : Nat :=
+    if h : i < as.size then
+      let f := scanClean s x lvl as[i] d fuel
+      if f > scanBudget then f else scanArr s x lvl as d (i + 1) f
+    else fuel
 
 /-- Assign `x xs := t` by inversion. The store is always returned: after `fail` it holds partial
 work (the caller's attempt is undone as a whole); after `delay` it is as before the call. -/
 def solveFlex (s : Store) (x : UVarId) (xs : Array Term) (t : Term) (d : Nat) : Store × Sol :=
   -- first-order case: a variable without a spine at its own depth takes any clean term as is
-  if xs.isEmpty && s.levelOf x == d && scanClean s x d t d then (s.setAssign x t, .ok) else
+  if xs.isEmpty && s.levelOf x == d && scanClean s x d t d scanBudget ≤ scanBudget then (s.setAssign x t, .ok) else
   match patternSpine s xs d with
   | none => (s, .delay)
   | some spine =>

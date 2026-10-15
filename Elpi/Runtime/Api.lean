@@ -123,6 +123,10 @@ structure CompiledProgram where
   /-- Native constraint handlers (tier T3) and unification hooks (tier T4). -/
   handlers : List (String × ConstraintHandler) := []
   hooks : Array UnifHook := #[]
+  /-- Warnings from loading (undeclared constants of an untyped program), for the front ends. -/
+  warnings : List String := []
+  /-- The program declared kinds, types or predicates of its own (not just the libraries'). -/
+  typed : Bool := false
   deriving Inhabited
 
 private def joinErrs (es : List TypeError) : String :=
@@ -160,9 +164,12 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
           ruleTerms := ruleTerms ++ [more.foldl (fun acc x => STm.app (.const "," r.pos) [acc, x] r.pos) t]
   let known := ruleTerms.foldl (init := p.definedNames) fun s t =>
     (Typecheck.clauseHead t).elim s s.insert
-  match Typecheck.checkProgram sig (clauses.toList.map (·.2.1) ++ ruleTerms) none known with
-  | .error es => throw (.type (joinErrs es))
-  | .ok () => pure ()
+  let typed := p.typed || decls.any fun d => match d with
+    | .kind .. | .type .. | .pred .. => true
+    | _ => false
+  let warns ← match Typecheck.checkProgram sig (clauses.toList.map (·.2.1) ++ ruleTerms) none known typed with
+    | .error es => throw (.type (joinErrs es))
+    | .ok ws => pure (ws.map TypeError.toString)
   let (items, ls) := (clauses.mapM fun (a, t, pos) => lowerClause a t pos).run { syms := p.syms }
   let items := p.items ++ items.filterMap id
   let lists ← graft items
@@ -184,7 +191,8 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
     match ls.syms.find? n with
     | some c => m.insert c.idx ms
     | none => m
-  return { p with syms := ls.syms, sig, items, db := Database.ofLists lists, modes, blocks }
+  let warnings := p.warnings ++ warns
+  return { p with syms := ls.syms, sig, items, db := Database.ofLists lists, modes, blocks, typed, warnings }
 where
   checkSignature' (sig : Signature) (d : Decl) : Except TypeError Signature :=
     Typecheck.checkSignature sig d
@@ -199,7 +207,8 @@ def stdDecls : Except ElpiError (List Decl) :=
 /-- The program with only the prelude and the standard library loaded. -/
 def baseProgram : Except ElpiError CompiledProgram := do
   let ds ← stdDecls
-  ({} : CompiledProgram).addDecls ds
+  -- the libraries declare types, but the program built on them has not declared any yet
+  return { (← ({} : CompiledProgram).addDecls ds) with typed := false }
 
 /-- Counts how often the parser ran in this process (tests use it to show that compiled
 programs are not parsed at runtime). -/
@@ -310,9 +319,9 @@ def CompiledProgram.prepareTm (p : CompiledProgram) (t : STm) (fuel : Nat := def
   if let some q := findQuote t then
     throw (.load s!"{q.toString}: Lean quotations need a Lean environment (use #elpi)")
   let (t', _) := elimGoal t 0
-  match Typecheck.checkProgram p.sig [] (some t') p.definedNames with
+  match Typecheck.checkProgram p.sig [] (some t') p.definedNames p.typed with
   | .error es => throw (.type (joinErrs es))
-  | .ok () => pure ()
+  | .ok _ => pure ()
   let (goal, ls) := (lowerTm #[] t').run { syms := p.syms }
   -- query variables become unification variables at level 0
   let mut store : Store :=
@@ -587,9 +596,9 @@ def CompiledProgram.assert (p : CompiledProgram) (clause : String) :
     match d with
     | .clause a t pos => clauses := clauses.push (a, elimSpilling t, pos)
     | _ => throw (.load "assert expects clauses")
-  match Typecheck.checkProgram sig (clauses.toList.map (·.2.1)) none p.definedNames with
+  match Typecheck.checkProgram sig (clauses.toList.map (·.2.1)) none p.definedNames p.typed with
   | .error es => throw (.type (joinErrs es))
-  | .ok () => pure ()
+  | .ok _ => pure ()
   let (items, ls) := (clauses.mapM fun (a, t, pos) => lowerClause a t pos).run { syms := p.syms }
   let mut db := p.db
   let mut allItems := p.items
