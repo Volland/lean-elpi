@@ -63,7 +63,7 @@ The engine SHALL implement the cut `!` with the ELPI 1.18 semantics: executing `
 - **THEN** the solutions are `X = 1` followed by `X = 3`, because the cut in `p` does not prune the second clause of `q`
 
 ### Requirement: Persistent store
-The binding of unification variables SHALL be held in a persistent (immutable, structurally shared) substitution, so that restoring an earlier state is a constant-time pointer swap with no trail to undo. Every choice point SHALL capture both the substitution and a snapshot of the host monad state, and backtracking to a choice point SHALL restore both exactly, discarding every binding and every host-state change made after it was created.
+The binding of unification variables SHALL be held in a store that behaves as a value: a store that was passed to an operation SHALL be unchanged afterwards for any caller that kept it, and the operations that derive a new store SHALL NOT make the cost of a binding depend on the size of the store or of the terms involved. Every choice point SHALL capture both a checkpoint of the store and a snapshot of the host monad state, and backtracking to a choice point SHALL restore both exactly, discarding every binding and every host-state change made after it was created.
 
 #### Scenario: Backtracking restores the substitution
 - **WHEN** the query `(X = 1, Y = a, fail) ; Z = X` is solved
@@ -72,6 +72,15 @@ The binding of unification variables SHALL be held in a persistent (immutable, s
 #### Scenario: Choice point restores host monad state
 - **WHEN** the engine runs in a host monad with a counter, a builtin `incr` increments the counter, and the query `(incr, fail) ; read-counter N` is solved starting from counter value 0
 - **THEN** it succeeds with `N = 0`, because the counter increment made in the failed branch is rolled back when the choice point is restored
+
+#### Scenario: Binding a variable does not copy the term it is bound to
+- **WHEN** `append` of two lists is run for lists of 81920 elements each
+- **THEN** it succeeds in time and memory proportional to the length of the lists
+- **AND** no step walks or copies the tail of the list that a clause variable is bound to
+
+#### Scenario: Backtracking in a large store
+- **WHEN** a query creates 100000 variables and then backtracks through 2000 alternatives
+- **THEN** each alternative starts from exactly the bindings it had when its choice point was created
 
 ### Requirement: Abstract machine
 The engine SHALL execute programs on an explicit abstract machine whose goal stack, choice-point stack and cut barriers are heap data, so that the depth of ELPI recursion is not bounded by the native call stack. Every run SHALL take a fuel budget counting resolution steps; when the fuel is exhausted the run SHALL stop with a distinguishable resource error, not with failure. Solutions SHALL be returned as a lazy stream: the machine SHALL compute the next solution only when it is demanded and SHALL resume from the saved choice points.
@@ -156,3 +165,10 @@ The engine SHALL provide the ELPI 1.18 core builtins with the oracle's behaviour
 #### Scenario: Printing and string builtins
 - **WHEN** the queries `print "a" 1`, `S is "foo" ^ "bar"` and `N is size "hello"` are solved
 - **THEN** standard output receives the line `a 1`, and the answers are `S = "foobar"` and `N = 5`, matching the oracle
+
+### Requirement: Hypothesis indexing
+A hypothetical clause added with `=>` SHALL be selected for a goal by its head predicate and by the first argument: a goal whose first argument is an eigenvariable SHALL NOT be tried against a hypothesis whose first argument is a different eigenvariable or a constant, while a variable or a λ in either position SHALL remain a possible match. Selection SHALL NOT change which clauses can apply, only how many are attempted.
+
+#### Scenario: A goal picks the hypothesis about its own name
+- **WHEN** 300 nested `pi x\ p x N => …` scopes are opened and the innermost goal is `p x 300`
+- **THEN** the goal succeeds using the innermost hypothesis

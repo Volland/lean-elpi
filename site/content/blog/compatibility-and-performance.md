@@ -6,6 +6,8 @@ summary: LeanElpi 0.3.0 against ELPI 1.18 and Teyjus: what ELPI's own test suite
 ---
 # How compatible and how fast is LeanElpi?
 
+> **Update, the same day.** These are the numbers for release 0.3.0. We then profiled the engine and found that the slowdown came from three specific costs, not from Lean, and fixed them: on the same programs the geometric-mean slowdown against ELPI went from 31 times to 3, and memory from gigabytes to about 100 MB. See [Why LeanElpi was 30 times slower, and what fixed it](/blog/why-leanelpi-was-slow/). The compatibility results below are unchanged.
+
 LeanElpi is a clean-room implementation of the ELPI dialect of λProlog. Two questions decide whether you can use it in place of the original: does it accept and run your programs, and how long do they take? We measured both for release 0.3.0, against ELPI 1.18.2 (the OCaml original) and, for speed, against Teyjus 2.1.1, the other well-known λProlog system. The short answer is that compatibility is partial and performance is not yet competitive. The numbers follow, with the commands to reproduce them.
 
 ## How we tested

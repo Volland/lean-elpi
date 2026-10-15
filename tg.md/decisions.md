@@ -112,13 +112,13 @@ LeanElpi is written from papers and documentation, never from upstream source, a
 
 ## Persistent store
 
-The substitution and constraint store are persistent data structures; a choice point keeps the old version together with the saved host-monad state.
+The store is a value to its users, and a choice point keeps a checkpoint of it together with the saved host-monad state; unification bindings live in arrays with an undo trail, constraints in persistent maps.
 
-**Context.** Backtracking must undo unification and, under `MetaM`, metavariable assignments made by Lean builtins. A mutable heap with a trail is fast but needs a trail entry for every effect.
+**Context.** Backtracking must undo unification and, under `MetaM`, metavariable assignments made by Lean builtins. Releases 0.1 to 0.3 kept bindings in a `Lean.PersistentHashMap` and let each choice point keep the old map. Measured against ELPI's own benchmark programs (`tests/bench`) that cost most of the run time, because the choice point pinned the old version, so every binding copied a path of nodes and freed the old one; the engine was 4 to 142 times slower and ran out of memory on some programs.
 
-**Decision.** Store uvar bindings in a `Lean.PersistentHashMap`. A [[glossary#Choice point]] holds the store and the `Backtrackable` snapshot of the host monad (`Meta.SavedState` under `MetaM`).
+**Decision.** Keep the interface and change the representation. A `Store` is still a value (a caller that keeps one never sees it change), and a [[glossary#Choice point]] still holds the `Backtrackable` snapshot of the host monad (`Meta.SavedState` under `MetaM`). Bindings go in arrays updated in place, with a trail; a choice point holds a `checkpoint` (the store without its arrays plus the trail length) and backtracking `undo`es to it. Constraints, the wake queue and handler state stay persistent and are restored from the checkpoint. Host effects keep using the snapshot, so no Lean-side effect needs a trail entry, which was the reason the trail was first rejected.
 
-**Consequences.** Backtracking is "restore the older value" and cannot forget an effect. Expect 3–10× slower execution than OCaml ELPI until the store is optimised behind its interface.
+**Consequences.** On the benchmark the engine is 1.1 to 10.7 times slower than ELPI (3 times by geometric mean) and uses tens to hundreds of megabytes. In-place update needs the store to have one owner; an accidental second reference silently turns an update into a copy of the arrays. The hot path is therefore written so that the store is its own parameter and the loops over it are plain recursion, and `tests/Core/Scaling.lean` fails when a copy creeps back.
 
 - status:: accepted
 - motivated_by:: [[decisions#Native Lean engine]]

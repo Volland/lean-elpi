@@ -56,7 +56,7 @@ Higher-order pattern unification with occurs check, pruning and scope checks; st
 
 ## Persistent substitution
 
-The persistent map from uvar to term plus the `Backtrackable` class that snapshots the host monad. Source: `Elpi/Core/Store.lean`.
+The store of unification variables (bindings in arrays with an undo trail, checkpoints for choice points) plus the `Backtrackable` class that snapshots the host monad. Source: `Elpi/Core/Store.lean`.
 
 - module:: Elpi.Core.Store
 - milestone:: M1
@@ -377,7 +377,7 @@ Runs ELPI 1.18's own test programs, copied under `tests/upstream/`, on `lean-elp
 
 Times `lean-elpi`, ELPI 1.18 and, where a program is also a Teyjus module, Teyjus on ELPI's own performance programs plus a few small ones of ours. It reports median and best wall time and peak memory per engine.
 
-`tests/bench/run.py` runs each workload N times (default 5) under one shared stack limit, from `tests/upstream/sources` (the `performance_FO` and `performance_HO` programs) and `tests/bench/programs` (`nrev`, `fib`, `hoabs`, sized to finish on every engine). A run that exits non-zero or exceeds the timeout is recorded as that status, never as a time. Teyjus comes from `TEYJUS_BIN`; it needs OCaml below 5.0. Results are published in the blog post [Compatibility and performance](site/content/blog/compatibility-and-performance.md).
+`tests/bench/run.py` runs each workload N times (default 5) under one shared stack limit, from `tests/upstream/sources` (the `performance_FO` and `performance_HO` programs) and `tests/bench/programs` (`nrev`, `fib`, `hoabs`, sized to finish on every engine). A run that exits non-zero or exceeds the timeout is recorded as that status, never as a time. Teyjus comes from `TEYJUS_BIN`; it needs OCaml below 5.0. Results are in `tests/bench/results/` (`2026-10-15.json` for 0.3.0, `2026-10-15-optimized.json` after the store rewrite) and published in two blog posts: [Compatibility and performance](site/content/blog/compatibility-and-performance.md) and [Why LeanElpi was slow](site/content/blog/why-leanelpi-was-slow.md). The harness times; it does not compare answers, which is the job of the conformance suites.
 
 - module:: tests/bench
 - depends_on:: [[components#Upstream compatibility suite]]

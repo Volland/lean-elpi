@@ -66,9 +66,9 @@ Unification variables created before the eigenvariable may not depend on it; sco
 
 ## Choice point
 
-A record of an untried alternative: the remaining clauses, the goal stack, the store version and the host-monad snapshot to restore on backtracking.
+A record of an untried alternative: the remaining clauses, the goal stack, a checkpoint of the store and the host-monad snapshot to restore on backtracking.
 
-Because the store is persistent, restoring a choice point is just reinstating the saved values: [[decisions#Persistent store]].
+Restoring a choice point undoes the bindings made since its checkpoint and reinstates the saved values: [[decisions#Persistent store]].
 
 - defines:: [[components#Abstract machine]]
 

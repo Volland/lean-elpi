@@ -61,10 +61,10 @@ Rejected as the main mechanism because it is incomplete and ties constraint sche
 
 Bind uvars in mutable cells and undo bindings from a trail on backtracking, as WAM-style engines and upstream ELPI do.
 
-Rejected for v1 because every Lean-side effect would need its own trail entry, and a forgotten entry is silent unsoundness. Performance can be recovered later behind the store interface.
+Rejected for v1 because every Lean-side effect would need its own trail entry, and a forgotten entry is silent unsoundness. Adopted in the store after measurement, for unification bindings only: host effects still use the `Backtrackable` snapshot, so the objection no longer applies.
 
-- status:: rejected
-- -contradicts:: [[decisions#Persistent store]]
+- status:: accepted
+- motivated_by:: [[decisions#Persistent store]]
 
 ## Recursive CPS interpreter
 

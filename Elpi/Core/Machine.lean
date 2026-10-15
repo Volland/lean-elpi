@@ -11,7 +11,9 @@ import Elpi.Core.CHR
 
 An explicit first-order machine for hereditary Harrop goals: the goal stack, the choice
 stack and the cut barriers are heap data, so ELPI recursion depth is not bounded by the
-native stack. Choice points keep the persistent `Store` and a host-monad snapshot.
+native stack. Choice points keep a `Store.checkpoint` and a host-monad snapshot. While the
+machine runs, the store is its own parameter rather than a field, so that nothing else holds
+a reference and the store's arrays are updated in place.
 -/
 
 -- @lat: [[components#Abstract machine]]
@@ -258,6 +260,7 @@ where
     | _ => .flex
 
 /-- A hypothetical clause with its head and first-argument key worked out now. -/
+-- @tg: implements:: [[openspec:elpi-core-engine#Hypothesis indexing]]
 def mkLocal (s : Store) (t : Term) (d : Nat) : LocalClause :=
   match localHead s t d with
   | some h => { term := t, depth := d, head := some h, key := localKey s d t d }

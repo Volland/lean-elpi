@@ -3,10 +3,13 @@
 ## Unreleased
 
 ### Added
-- Benchmark harness `tests/bench/run.py` (LeanElpi, ELPI 1.18 and Teyjus on ELPI's performance programs), its results for 0.3.0, and the blog post "How compatible and how fast is LeanElpi?".
+- Benchmark harness `tests/bench/run.py` (LeanElpi, ELPI 1.18 and Teyjus on ELPI's performance programs), its results, and the blog posts "How compatible and how fast is LeanElpi?" and "Why LeanElpi was 30 times slower than ELPI, and what fixed it".
+- `tests/Core/Scaling.lean`: guards against the engine copying its store or a term.
+- Hypotheses added with `=>` are indexed by head and first argument (`Key.bound` for eigenvariables).
 
 ### Changed
-- Design paper: the expected slowdown against ELPI is replaced by the measured one (about 30 times).
+- Engine speed and memory (OpenSpec change `optimize-engine-store`): head matching binds clause variables directly; the binding store is an array with an undo trail and choice points keep a checkpoint; a first-order fast path in the unifier; β-reduction substitutes all arguments in one pass. On ELPI's performance programs the geometric-mean slowdown against ELPI went from 31 times to 3 and peak memory from gigabytes to about 100 MB. Conformance results are unchanged.
+- The requirement "Persistent store" states the behaviour (value semantics, restore on backtracking), not the representation; the design paper, the decision record and the performance section were updated.
 
 ## 0.3.0 — 2026-10-15
 

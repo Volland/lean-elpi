@@ -7,7 +7,7 @@ This paper describes the LeanElpi engine: how terms are represented, how higher-
 
 ## Overview
 
-The engine is a loop over an explicit machine state. Its substitution is a persistent map, so a choice point is just a saved value and backtracking is restoring it.
+The engine is a loop over an explicit machine state. Its substitution is a store with value semantics, so a choice point is a checkpoint and backtracking undoes the bindings made since.
 
 Four decisions shape the engine. [[decisions#Native Lean engine]] makes it Lean code. [[decisions#Explicit abstract machine]] makes control a data structure instead of the Lean call stack. [[decisions#Persistent store]] makes backtracking cheap and safe with effectful host monads. [[decisions#Monad-generic core and packaging]] makes the same code run in `Id`, `IO` and `MetaM`. The modules are the [[components#Term store]], [[components#Unifier]], [[components#Persistent substitution]], [[components#Clause index]], [[components#Abstract machine]], [[components#Constraint store]] and [[components#CHR engine]]. Their classes appear in [[uml#Core class diagram]].
 
@@ -157,7 +157,7 @@ structure Frame where
 structure MachineState (m : Type → Type) [Backtrackable m] where
   goals   : List Frame                    -- goal stack
   choices : List (ChoicePoint m)          -- choice-point stack
-  store   : Store                         -- persistent substitution + constraints
+  store   : Store                         -- substitution (arrays + trail) + constraints
   fuel    : Nat
 ```
 
@@ -195,17 +195,31 @@ Because the loop is a tail-recursive function over this state, a predicate that 
 
 ## Persistent store and backtracking
 
-The substitution is a persistent hash map from variable identities to terms. Old versions stay valid after updates, so a choice point keeps the version current when it was made, and backtracking restores it.
+The substitution behaves as a value, but its bindings live in arrays with an undo trail, and a choice point keeps a checkpoint instead of the whole store.
+
+A caller that keeps a store never sees it change; the arrays are updated in place only when the store has one owner.
 
 This is [[decisions#Persistent store]], `elpi-core-engine › Persistent store`, and [[components#Persistent substitution]].
 
-### Why persistence
+### Why a trail now
 
-Prolog machines traditionally update variables in place and keep a trail of bindings to undo on backtracking. A persistent map turns the trail into "drop the newer version".
+Releases 0.1 to 0.3 used `Lean.PersistentHashMap`, and on `queens` that was 83% of the run time.
 
-The [[components#Persistent substitution]] is built on `Lean.PersistentHashMap`. Assigning a variable returns a new map that shares almost all structure with the old one. A [[glossary#Choice point]] stores the map that was current when it was created. Backtracking discards the newer map and resumes with the stored one, in constant time (scenario "Backtracking restores the substitution").
+Backtracking was "drop the newer version", which is easy to get right, but each choice point pinned the version it saw, so every later binding copied a path of 32-wide nodes and freed the old one ([[components#Benchmark harness]]).
 
-The rejected design, a mutable heap with a trail ([[alternatives#Mutable heap with trail]]), is faster per binding in OCaml. In Lean it would mean `ST` or `IO` references threaded through the core, making the pure `Id` mode awkward. More importantly it would need a second, separate undo mechanism for the host monad's own state. With persistence, the substitution and the host state are restored the same way: by putting back a saved value.
+The store now records the variables assigned since the newest choice point on a trail, and a [[glossary#Choice point]] holds a `checkpoint`: the store without its arrays, plus the trail length, the variable count and the persistent fields (constraints, wake queue, names). Backtracking resets the trailed variables and truncates the arrays (scenario "Backtracking restores the substitution"). Variables created after the choice point are not trailed; truncating the arrays discards them.
+
+### Keeping one owner
+
+Lean updates an array in place only when nothing else references it, so the design is fast only while the store has a single owner.
+
+The store therefore travels beside the machine as its own parameter, failed attempts hand it back instead of returning nothing, and the loops that thread it are plain recursion: a `for` loop with an early `return` keeps the previous value in its result state, and a monadic continuation or a closure that mentions the store keeps a second reference alive. Each of these was found with the compiler's IR and `dbgTraceIfShared`, and each turned an O(1) update into a copy of the arrays. `tests/Core/Scaling.lean` fails if one returns.
+
+### Host state is not trailed
+
+The trail covers only unification bindings; the host monad's own state keeps using a saved snapshot.
+
+The rejected design ([[alternatives#Mutable heap with trail]]) would have needed a second undo mechanism for that state. The objection still holds for effects, which is why they are not trailed: the trail covers only unification bindings, and the host state is restored by putting back a saved value as before.
 
 ### Choice points capture host state
 
@@ -368,17 +382,18 @@ Beyond CHR written in ELPI, the [[decisions#Tiered solver API]] lets Lean code p
 
 ## Performance expectations
 
-The first implementation was expected to run 3 to 10 times slower than OCaml ELPI. Measured on 0.3.0 it is about 30 times slower and uses far more memory ([[components#Benchmark harness]]); the design still leaves room to close the gap.
+Expected 3 to 10 times slower than OCaml ELPI; measured 4 to 142 times on 0.3.0 and 1.1 to 10.7 times (3 by geometric mean) now ([[components#Benchmark harness]]).
 
-The slowdown has known sources: persistent maps cost a logarithmic factor where OCaml ELPI writes a mutable reference; terms are boxed Lean values with reference counting; and the first version interprets clause bodies instead of compiling them. For the intended uses (tactics, derivers, rule engines inside programs) that is acceptable, and correctness against the oracle comes first.
+On 0.3.0 some programs also ran out of memory; the engine now uses tens to hundreds of megabytes.
 
-Optimisations planned behind the `Store` interface, in rough order:
+The 0.3.0 numbers were not caused by Lean or by interpreting clause bodies. Profiling found three specific costs: unification rebuilt the whole term every time it bound a variable (quadratic on lists); the persistent map copied a path of nodes per binding; and hypotheses added with `=>` were tried one by one, with goal arguments dereferenced again at every step. They are fixed by binding clause variables during head matching, the trail described above, a first-order fast path in the unifier, an index on hypotheses (eigenvariables included) and one-pass β-reduction.
 
-1. **Hash-consing and sharing** of ground terms, already used for reflected Lean terms.
-2. **Path compression** in variable dereferencing, cached in the persistent map.
-3. **A mutable store for pure queries** that never backtrack across a host-state boundary, built on `ST` and selected per query. The machine sees the same `Store` interface.
-4. **Clause precompilation**: heads compiled to matching code, and indexing beyond the first argument once `:index` is supported.
-5. **Benchmarks**, now in place: `tests/bench/run.py` times ELPI's own performance programs against the oracle, and its results set the order of the work above (memory first, since three programs exhaust it).
+What remains is mostly allocation: a clause body is rebuilt as a term on every call, and Lean's reference counting frees it again. Optimisations still open, in rough order:
+
+1. **Clause precompilation**: heads compiled to matching code and bodies to goal sequences, so a call allocates only what it binds. Indexing beyond the first argument once `:index` is supported.
+2. **Hash-consing and sharing** of ground terms, already used for reflected Lean terms; a cached "closed" bit would let β-reduction and the scope scan skip them.
+3. **Store compaction**: the arrays grow with every variable created in a long deterministic run, because nothing reclaims variables no goal can reach.
+4. **Deeper dereferencing**: path compression for chains of pruned variables, which dominate `lambda3`.
 
 Because the machine talks to the substitution only through the `Store` interface, each of these can land without touching resolution, cut or constraints, and the oracle keeps every step honest.
 

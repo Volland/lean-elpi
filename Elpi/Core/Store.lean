@@ -4,11 +4,14 @@ import Elpi.Core.Term
 import Elpi.Core.Constraints
 
 /-!
-# Persistent substitution
+# Substitution store
 
-Persistent uvar substitution and the `Backtrackable` host-monad class. The store is an
-immutable, structurally shared value, so a choice point keeps the `Store` it was created
-with and backtracking is a pointer swap.
+The uvar substitution and the `Backtrackable` host-monad class. A `Store` behaves as a value
+(a caller that keeps one never sees it change), but its bindings live in arrays that are
+updated in place when the store is not shared, with an undo trail: a choice point keeps a
+`checkpoint` and backtracking `undo`es to it. Persistent maps were measured to cost most of
+the run time, because each choice point pinned the old version and every binding copied a
+path of nodes.
 -/
 
 -- @lat: [[components#Persistent substitution]]

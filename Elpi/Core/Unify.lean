@@ -3,7 +3,7 @@ import Elpi.Core.Store
 /-!
 # Unifier
 
-Higher-order pattern unification over the persistent store: rigid–rigid decomposition
+Higher-order pattern unification over the substitution store: rigid–rigid decomposition
 with λ-descent and η-expansion, flex–rigid inversion with pruning and an occurs check,
 flex–flex, and suspension of problems outside the pattern fragment. Argument spines are
 processed through an explicit worklist so long lists do not use native stack.
