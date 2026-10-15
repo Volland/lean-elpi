@@ -81,6 +81,8 @@ Program database with first-argument indexing, clause names and grafting, accumu
 
 A clause is compiled when it enters a `PredDB`: `args` holds the head's arguments and `goals` the body with top-level `,` split and `true` dropped. The candidate array of each first-argument key already includes the variable-headed clauses in clause order (`PredDB.ofArray` builds them in one pass, `push` appends), so `candidates` returns a stored array and allocates nothing, like ELPI's `get_clauses`.
 
+A predicate declared with `:index (d1 … dn)` keeps that specification in its `PredDB` and in the machine's environment. A call then takes the first-argument bucket and drops the clauses (and hypotheses) whose indexed arguments rigidly clash with the call's within `di` levels (`PredDB.select`, `idxMatch`); a hash of each ground indexed argument, stored with the clause, makes the common case one comparison. Variables and λ-terms never clash, so the specification changes how many clauses are tried, not the answers.
+
 - module:: Elpi.Core.Index
 - milestone:: M1
 - depends_on:: [[components#Term store]]

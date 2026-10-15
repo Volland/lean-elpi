@@ -22,6 +22,10 @@ structure LocalClause where
   the head was not yet visible, so it is recomputed at each call). -/
   head : Option ConstId := none
   key : Key := .flex
+  /-- The head's arguments, for `:index` filtering (empty when the head was not yet visible). -/
+  hargs : Array Term := #[]
+  /-- `indexHashes` of `hargs` under the predicate's `:index` specification (empty: none). -/
+  ihash : Array UInt64 := #[]
   deriving Inhabited
 
 /-- Hypothetical clauses: all of them, newest group first, and the same clauses indexed by head

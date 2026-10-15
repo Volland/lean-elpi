@@ -120,6 +120,9 @@ structure Clause where
   pos : Pos := {}
   args : Array Term := #[]
   goals : Array Term := #[]
+  /-- For an `:index` predicate: per indexed argument, `groundHash` of the head's argument (0: it
+  has a variable within the indexed depth). Filled when the clause enters a `PredDB`. -/
+  ihash : Array UInt64 := #[]
   deriving Inhabited
 
 /-- The goals of a clause body: conjunctions split, `true` dropped, in order. -/
@@ -130,6 +133,33 @@ partial def flattenBody (t : Term) (acc : Array Term := #[]) : Array Term :=
   | _ => acc.push t
 
 -- @tg: implements:: [[openspec:elpi-core-engine#Compiled clauses and term sharing]]
+/-- A hash of `t` to `n` levels (only the head and arity at the deepest level), or `0` when a
+variable, λ or bound name occurs within them. Two terms with different non-zero hashes clash
+rigidly within `n` levels, so a clause and a call whose hashes differ cannot unify. `deref`
+gives the head of a term (a call's arguments may contain assigned variables). -/
+partial def groundHash (deref : Term → Term) (t : Term) (n : Nat) : UInt64 :=
+  if n == 0 then 1 else
+  -- a rigid term never hashes to 0, which is reserved for "has a variable"
+  let nz (h : UInt64) : UInt64 := if h == 0 then 1 else h
+  match deref t with
+  | .const c => nz (mixHash 2 (hash c.idx))
+  | .lit l => nz (mixHash 3 (hash l))
+  | .app (.const c) as =>
+    let h0 := mixHash (mixHash 4 (hash c.idx)) (hash as.size)
+    if n == 1 then nz h0 else Id.run do
+      let mut h := h0
+      for a in as do
+        let g := groundHash deref a (n - 1)
+        if g == 0 then return 0
+        h := mixHash h g
+      return nz h
+  | _ => 0
+
+/-- The per-argument hashes of a head's arguments under an `:index` specification. -/
+def indexHashes (deref : Term → Term) (spec : Array Nat) (args : Array Term) : Array UInt64 :=
+  spec.mapIdx fun i n =>
+    if h : i < args.size then (if n > 0 then groundHash deref args[i] n else 0) else 0
+
 def Clause.compile (c : Clause) : Clause :=
   { c with args := (match c.head with | .app _ as => as | _ => #[]), goals := flattenBody c.body }
 
@@ -156,6 +186,9 @@ structure PredDB where
   byKey : Lean.PersistentHashMap Key (Array Clause) := {}
   /-- The clauses whose first argument is a variable: the candidates for a key with no bucket. -/
   flex : Array Clause := #[]
+  /-- The `:index` specification: how deep each argument is indexed (0: not at all). Empty means
+  the default, the first argument to depth one, which `byKey` answers by itself. -/
+  spec : Array Nat := #[]
   deriving Inhabited
 
 namespace PredDB
@@ -163,6 +196,7 @@ namespace PredDB
 /-- Add a clause at the end. A clause with a variable first argument joins every bucket. -/
 def push (db : PredDB) (c : Clause) : PredDB :=
   let c := c.compile
+  let c := if db.spec.isEmpty then c else { c with ihash := indexHashes id db.spec c.args }
   let clauses := db.clauses.push c
   match firstKey c.head with
   | .flex =>
@@ -171,8 +205,10 @@ def push (db : PredDB) (c : Clause) : PredDB :=
   | k => { db with clauses, byKey := db.byKey.insert k ((db.byKey.findD k db.flex).push c) }
 
 /-- Build the index of a whole predicate at once, in time linear in the size of its buckets. -/
-def ofArray (cs : Array Clause) : PredDB := Id.run do
-  let cs := cs.map Clause.compile
+def ofArray (cs : Array Clause) (spec : Array Nat := #[]) : PredDB := Id.run do
+  let cs := cs.map fun c =>
+    let c := c.compile
+    if spec.isEmpty then c else { c with ihash := indexHashes id spec c.args }
   let keys := cs.map (firstKey ·.head)
   -- positions of each key, ascending
   let mut pos : Std.HashMap Key (Array Nat) := {}
@@ -193,7 +229,7 @@ def ofArray (cs : Array Clause) : PredDB := Id.run do
       else
         out := out.push cs[flexPos[j]!]!; j := j + 1
     byKey := byKey.insert k out
-  return { clauses := cs, byKey, flex := flexPos.map (cs[·]!) }
+  return { clauses := cs, byKey, flex := flexPos.map (cs[·]!), spec }
 
 /-- Candidate clauses for a call whose first argument has key `k`, in clause order. Nothing is
 built here: the array was prepared when the clauses were added. -/
@@ -202,6 +238,56 @@ def candidates (db : PredDB) (k : Key) : Array Clause :=
   match k with
   | .flex => db.clauses
   | k => db.byKey.findD k db.flex
+
+/-- Could the clause-head term `h` (clause variables `cvar` match anything) unify with the call
+argument `g`, looking `n` levels deep? Only a clash between rigid constants, literals or
+applications of constants rules a clause out; variables and λ-terms always stay possible, so
+this never drops a clause that could apply. `deref` gives the head of the call's term. -/
+partial def idxMatch (deref : Term → Term) (h g : Term) (n : Nat) : Bool :=
+  if n == 0 then true else
+  match h with
+  | .cvar .. | .uvar .. | .lam _ | .bound _ => true
+  | _ =>
+    match deref g with
+    | .uvar .. | .lam _ | .bound _ | .cvar .. => true
+    | g' =>
+      match h, g' with
+      | .app (.const a) as, .app (.const b) bs =>
+        a == b && as.size == bs.size && idxArgs deref as bs 0 (n - 1)
+      | .const a, .const b => a == b
+      | .lit a, .lit b => a == b
+      | .app (.const _) _, .const _ | .const _, .app (.const _) _ => false
+      | .app (.const _) _, .lit _ | .lit _, .app (.const _) _ => false
+      | .const _, .lit _ | .lit _, .const _ => false
+      | _, _ => true
+where
+  idxArgs (deref : Term → Term) (as bs : Array Term) (i n : Nat) : Bool :=
+    if h : i < as.size then
+      idxMatch deref as[i] bs[i]! n && idxArgs deref as bs (i + 1) n
+    else true
+
+/-- The candidate clauses for a call with arguments `args` (heads dereferenced by the caller):
+with the default specification the first-argument bucket, otherwise the clauses whose indexed
+arguments are all compatible with the call's, in clause order. -/
+-- @tg: implements:: [[openspec:elpi-core-engine#Deep and multi-argument indexing]]
+def select (db : PredDB) (deref : Term → Term) (args : Array Term) (k : Key) : Array Clause :=
+  if db.spec.isEmpty then db.candidates k
+  else
+    -- start from the first-argument bucket when the first argument is indexed
+    let base := if db.spec[0]! ≥ 1 then db.candidates k else db.clauses
+    let ghs := indexHashes deref db.spec args
+    base.filter fun c => Id.run do
+      for i in [0:db.spec.size] do
+        let n := db.spec[i]!
+        if n > 0 && i < c.args.size && i < args.size then
+          let ch := c.ihash[i]!
+          let gh := ghs[i]!
+          -- both ground to the indexed depth: equal hashes are the same structure, different
+          -- ones a rigid clash; otherwise compare the structures
+          if ch != 0 && gh != 0 then
+            if ch != gh then return false
+          else if !idxMatch deref c.args[i]! args[i]! n then return false
+      return true
 
 end PredDB
 
@@ -254,9 +340,10 @@ structure Database where
   preds : Lean.PersistentHashMap ConstId PredDB := {}
   deriving Inhabited
 
-def Database.ofLists (lists : Std.HashMap Nat (Array Clause)) : Database :=
+def Database.ofLists (lists : Std.HashMap Nat (Array Clause))
+    (specs : Std.HashMap Nat (Array Nat) := {}) : Database :=
   { preds := lists.fold (init := {}) fun m p cs =>
-      m.insert ⟨p⟩ (PredDB.ofArray cs) }
+      m.insert ⟨p⟩ (PredDB.ofArray cs (specs.getD p #[])) }
 
 /-- Add a clause at the end of its predicate; the original database is untouched. -/
 def Database.assert (db : Database) (p : ConstId) (c : Clause) : Database :=

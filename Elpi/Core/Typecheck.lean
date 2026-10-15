@@ -54,6 +54,8 @@ structure Signature where
   overloads : Std.HashMap String (Array Scheme) := {}
   abbrevs : Std.HashMap String Abbrev := {}
   modes : Std.HashMap String (Array Mode) := {}
+  /-- `:index` specifications: the depth to which each argument of a predicate is indexed. -/
+  indexes : Std.HashMap String (Array Nat) := {}
   deriving Inhabited
 
 structure TypeError where
@@ -153,7 +155,7 @@ def checkSignature (sig : Signature) : Decl → Except TypeError Signature
         if old.ty == t then s
         else { s with overloads := s.overloads.insert n ((s.overloads.getD n #[]).push sc) }
       | none => { s with consts := s.consts.insert n sc }) sig
-  | .pred name args _ => do
+  | .pred name args _ index => do
     let mut vars : Array String := #[]
     let mut tys : Array Ty := #[]
     for (_, a) in args do
@@ -162,7 +164,8 @@ def checkSignature (sig : Signature) : Decl → Except TypeError Signature
     let ty := tys.foldr (fun a acc => .arrow a acc) tyProp
     return { sig with
       consts := sig.consts.insert name { nvars := vars.size, ty },
-      modes := sig.modes.insert name (args.map (·.1)).toArray }
+      modes := sig.modes.insert name (args.map (·.1)).toArray,
+      indexes := if index.isEmpty then sig.indexes else sig.indexes.insert name index.toArray }
   | _ => return sig
 
 /-! ### Inference -/

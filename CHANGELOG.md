@@ -4,6 +4,7 @@
 
 ### Added
 - ELPI 1.18 syntax (OpenSpec change `close-compat-gaps`): `macro @name X :- body.`, `pi x y z\ body` and `sigma x y\ body`, blanks before a binder's backslash, a trailing comma in a list, `:index (...)` before a declaration.
+- `:index (d1 … dn)` on a `pred` declaration is used (OpenSpec change `add-deep-indexing`): a call is offered only the clauses and hypotheses whose indexed arguments do not clash with its own to that depth. `dt` 18 s to 4 s, `index2` 47 s to 6 s.
 - Library: `std.int.map`, `std.int.set`, `std.time` and the `gettimeofday` builtin; `std.map` is now a balanced tree with the type `std.map K V`.
 - `tests/Core/Compat.lean`; the benchmark covers every ELPI performance program.
 

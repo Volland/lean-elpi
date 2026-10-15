@@ -59,6 +59,8 @@ structure Attrs where
   name : Option String := none
   before : Option String := none
   after : Option String := none
+  /-- `:index (d1 d2 …)`: how deep each argument is indexed (0 for `_`, not indexed). -/
+  index : List Nat := []
   deriving Inhabited
 
 /-- A CHR rule `rule K… \\ R… | Guard <=> Body`. -/
@@ -73,7 +75,7 @@ structure CHRRuleAst where
 inductive Decl where
   | kind (names : List String) (ty : STy) (p : Pos)
   | type (names : List String) (ty : STy) (p : Pos)
-  | pred (name : String) (args : List (Mode × STy)) (p : Pos)
+  | pred (name : String) (args : List (Mode × STy)) (p : Pos) (index : List Nat := [])
   | typeabbrev (name : String) (params : List String) (ty : STy) (p : Pos)
   | clause (attrs : Attrs) (t : STm) (p : Pos)
   | accumulate (file : String) (p : Pos)
@@ -651,25 +653,33 @@ partial def parseDecl : PM Decl := do
           let .str v := s.tok | fail s.pos "string expected after ':after'"
           advance; attrs := { attrs with after := some v }
         | .ident "index" =>
-          -- ignored with a warning: first-argument indexing is kept
+          -- the depth of each argument; any other token inside the parentheses is skipped
           advance; advance
           let l ← peek
           if l.tok == .lp then
             let mut depth := 0
+            let mut ds : Array Nat := #[]
             repeat
               let x ← peek
               if x.tok == .lp then depth := depth + 1
               if x.tok == .rp then depth := depth - 1
               if x.tok == .eof then fail x.pos "unterminated ':index'"
+              match x.tok with
+              | .int k => ds := ds.push k.toNat
+              | .var "_" => ds := ds.push 0
+              | _ => pure ()
               advance
               if depth == 0 then break
+            attrs := { attrs with index := ds.toList }
         | .ident _ => advance; advance
         | _ => break
       | _ => break
     -- attributes such as `:index (1)` may also precede a declaration
     let nx ← peek
     if nx.tok == .ident "pred" || nx.tok == .ident "type" then
-      return (← parseDecl)
+      match ← parseDecl with
+      | .pred n a p _ => return .pred n a p attrs.index
+      | d => return d
     let c ← parseExpr 0
     expect .dot
     return .clause attrs c t.pos
@@ -931,7 +941,7 @@ partial def declaredNames (ds : List Decl) : Std.HashSet String :=
   ds.foldl (fun acc d =>
     match d with
     | .kind ns _ _ | .type ns _ _ => ns.foldl (·.insert ·) acc
-    | .pred n _ _ => acc.insert n
+    | .pred n _ _ _ => acc.insert n
     | .typeabbrev n _ _ _ => acc.insert n
     | .clause _ t _ =>
       let rec head : STm → Option String
@@ -974,7 +984,7 @@ partial def flattenNs (scopes : Scopes) (ds : List Decl) : List Decl :=
       flattenNs ((full, declaredNames inner) :: scopes) inner
     | .kind ns ty p => [.kind (ns.map q) ty p]
     | .type ns ty p => [.type (ns.map q) (qualTy scopes ty) p]
-    | .pred n args p => [.pred (q n) (args.map fun (m, t) => (m, qualTy scopes t)) p]
+    | .pred n args p ix => [.pred (q n) (args.map fun (m, t) => (m, qualTy scopes t)) p ix]
     | .typeabbrev n ps ty p => [.typeabbrev (q n) ps (qualTy scopes ty) p]
     | .clause a t p => [.clause a (qualTm scopes [] t) p]
     | .constraint ps rs p =>

@@ -81,6 +81,9 @@ structure Env (m : Type → Type) where
   /-- LF predicates (by constant index) and the derivation depth bound for them. -/
   lfPreds : Std.HashSet Nat := {}
   bound : Option Nat := none
+  /-- `:index` specifications by predicate (constant index): the depth to which each argument is
+  indexed. They apply to hypotheses as well as to the program's clauses. -/
+  indexes : Std.HashMap Nat (Array Nat) := {}
 
 /-- A raw solution: the final store and the constraints still suspended in it. -/
 structure RawSolution where
@@ -269,21 +272,34 @@ where
       else .flex
     | _ => .flex
 
+/-- The arguments of the head of a hypothetical clause (peeling `pi` and `:-`). -/
+partial def localArgs (s : Store) (t : Term) (d : Nat) : Array Term :=
+  match s.deref t d with
+  | .app (.const c) #[.lam b] => if c == cPi then localArgs s b (d + 1) else #[]
+  | .app (.const c) #[h, _] => if c == cNeck then localArgs s h d else (match s.deref t d with | .app _ as => as | _ => #[])
+  | .app _ as => as
+  | _ => #[]
+
 /-- A hypothetical clause with its head and first-argument key worked out now. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Hypothesis indexing]]
-def mkLocal (s : Store) (t : Term) (d : Nat) : LocalClause :=
+def mkLocal (specs : Std.HashMap Nat (Array Nat)) (s : Store) (t : Term) (d : Nat) : LocalClause :=
   match localHead s t d with
-  | some h => { term := t, depth := d, head := some h, key := localKey s d t d }
+  | some h =>
+    let hargs := localArgs s t d
+    let sp := specs.getD h.idx #[]
+    { term := t, depth := d, head := some h, key := localKey s d t d, hargs,
+      ihash := if sp.isEmpty then #[] else indexHashes (s.deref · d) sp hargs }
   | none => { term := t, depth := d }
 
 /-- Split a clause set (`,`-conjunction or list) into hypothetical clauses. -/
-partial def toLocals (s : Store) (t : Term) (d : Nat) : List LocalClause :=
+partial def toLocals (specs : Std.HashMap Nat (Array Nat)) (s : Store) (t : Term) (d : Nat) :
+    List LocalClause :=
   match s.deref t d with
   | .app (.const c) #[a, b] =>
-    if c == cConj || c == cCons then toLocals s a d ++ toLocals s b d
-    else [mkLocal s t d]
-  | .const c => if c == cTrue || c == cNil then [] else [mkLocal s t d]
-  | _ => [mkLocal s t d]
+    if c == cConj || c == cCons then toLocals specs s a d ++ toLocals specs s b d
+    else [mkLocal specs s t d]
+  | .const c => if c == cTrue || c == cNil then [] else [mkLocal specs s t d]
+  | _ => [mkLocal specs s t d]
 
 /-- Unify head arguments (from position `i`) with goal arguments, in match mode for input
 positions. The store is returned in every case, with partial bindings after a failure. -/
@@ -611,7 +627,7 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
         return .cont { M with goals := { f with goal := args[0]! } :: rest,
                               choices := M.choices.push cp } s.track
       else if c == cImpl && args.size == 2 then
-        let ls := toLocals s args[0]! d
+        let ls := toLocals env.indexes s args[0]! d
         return .cont { M with goals := { f with goal := args[1]!, locals := Locals.prepend ls f.locals } :: rest } s
       else if c == cPi && args.size == 1 then
         let g' := match s.deref args[0]! d with
@@ -726,8 +742,22 @@ partial def callPred {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m 
             | none => localHead s lc.term lc.depth == some c &&
                       (localKey s lc.depth lc.term lc.depth).compatible key
           if ok then locs := locs.push lc
+      -- an `:index` specification narrows the hypotheses the same way as the program's clauses
+      if !env.indexes.isEmpty && !locs.isEmpty then
+        if let some sp := env.indexes[c.idx]? then
+          let ghs := indexHashes (s.deref · d) sp args
+          locs := locs.filter fun lc => Id.run do
+            for i in [0:sp.size] do
+              let n := sp[i]!
+              if n > 0 && i < lc.hargs.size && i < args.size then
+                let ch := lc.ihash[i]!
+                let gh := ghs[i]!
+                if ch != 0 && gh != 0 then
+                  if ch != gh then return false
+                else if !PredDB.idxMatch (s.deref · d) lc.hargs[i]! args[i]! n then return false
+            return true
       let stat : Array Clause := match env.db.preds.find? c with
-        | some db => db.candidates key
+        | some db => if db.spec.isEmpty then db.candidates key else db.select (s.deref · d) args key
         | none => #[]
       -- LF goals go one derivation level deeper; the strategy's bound prunes them
       let isLF := env.lfPreds.contains c.idx

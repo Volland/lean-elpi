@@ -125,6 +125,8 @@ structure CompiledProgram where
   hooks : Array UnifHook := #[]
   /-- Warnings from loading (undeclared constants of an untyped program), for the front ends. -/
   warnings : List String := []
+  /-- `:index` specifications by predicate (constant index). -/
+  indexSpecs : Std.HashMap Nat (Array Nat) := {}
   /-- The program declared kinds, types or predicates of its own (not just the libraries'). -/
   typed : Bool := false
   deriving Inhabited
@@ -192,7 +194,12 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
     | some c => m.insert c.idx ms
     | none => m
   let warnings := p.warnings ++ warns
-  return { p with syms := ls.syms, sig, items, db := Database.ofLists lists, modes, blocks, typed, warnings }
+  let specs := sig.indexes.fold (init := ({} : Std.HashMap Nat (Array Nat))) fun m n sp =>
+    match ls.syms.find? n with
+    | some c => m.insert c.idx sp
+    | none => m
+  let db := Database.ofLists lists specs
+  return { p with syms := ls.syms, sig, items, db, modes, blocks, typed, warnings, indexSpecs := specs }
 where
   checkSignature' (sig : Signature) (d : Decl) : Except TypeError Signature :=
     Typecheck.checkSignature sig d
@@ -301,7 +308,7 @@ def CompiledProgram.env (p : CompiledProgram) (m : Type → Type) [Monad m] [Out
   let core := Builtins.core m
   let lift (b : Builtin Id) : Builtin m := { sig := b.sig, run := fun c a => pure (b.run c a) }
   let all := core ++ p.extra.map lift
-  { syms, db := p.db, modes := p.modes
+  { syms, db := p.db, modes := p.modes, indexes := p.indexSpecs
     blocks := p.blocks
     handlers := p.handlers.foldl (init := {}) fun h (n, hd) =>
       hd.keys.foldl (init := h) fun h k =>
