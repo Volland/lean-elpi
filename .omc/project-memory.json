@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1791966503911,
+  "lastScanned": 1792054470858,
   "projectRoot": "/Users/volodymyrpavlyshyn/Documents/work/lean-elpi",
   "techStack": {
     "languages": [],
@@ -24,16 +24,32 @@
   "structure": {
     "isMonorepo": false,
     "workspaces": [],
-    "mainDirectories": [],
-    "gitBranches": null
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "lib",
+      "scripts",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
   },
   "customNotes": [],
   "directoryMap": {
+    "Elpi": {
+      "path": "Elpi",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1792054470833,
+      "keyFiles": []
+    },
     "Templates": {
       "path": "Templates",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1791966503902,
+      "lastAccessed": 1792054470834,
       "keyFiles": [
         "Change.md",
         "Concept.md",
@@ -46,28 +62,102 @@
       "path": "Types",
       "purpose": "Type definitions",
       "fileCount": 1,
-      "lastAccessed": 1791966503902,
+      "lastAccessed": 1792054470846,
       "keyFiles": [
         "code-types.md"
       ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 3,
+      "lastAccessed": 1792054470847,
+      "keyFiles": [
+        "404.html",
+        "index.html"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 0,
+      "lastAccessed": 1792054470848,
+      "keyFiles": []
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1792054470848,
+      "keyFiles": []
     },
     "openspec": {
       "path": "openspec",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1791966503903,
+      "lastAccessed": 1792054470849,
       "keyFiles": [
         "config.yaml"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 3,
+      "lastAccessed": 1792054470852,
+      "keyFiles": [
+        "check-core-imports.sh",
+        "gen-root-imports.py",
+        "install-oracle.sh"
+      ]
+    },
+    "site": {
+      "path": "site",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1792054470852,
+      "keyFiles": [
+        "build.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1792054470853,
+      "keyFiles": [
+        "TestUtil.lean"
       ]
     },
     "tg.md": {
       "path": "tg.md",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1791966503903,
+      "fileCount": 8,
+      "lastAccessed": 1792054470853,
       "keyFiles": [
+        "alternatives.md",
+        "changes.md",
         "code-ontology.md",
-        "tg.md"
+        "constraints.md",
+        "decisions.md"
+      ]
+    },
+    "docs/assets": {
+      "path": "docs/assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1792054470855,
+      "keyFiles": [
+        "style.css"
+      ]
+    },
+    "site/assets": {
+      "path": "site/assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1792054470855,
+      "keyFiles": [
+        "style.css"
       ]
     }
   },

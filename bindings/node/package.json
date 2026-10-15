@@ -5,7 +5,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "files": ["index.js", "index.d.ts", "README.md", "LICENSE"],
-  "scripts": { "test": "node --test test/" },
+  "scripts": { "test": "node --test test/*.test.js" },
   "keywords": ["lambda-prolog", "elpi", "logic-programming", "lean4", "prolog"],
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/Volland/lean-elpi.git", "directory": "bindings/node" },
