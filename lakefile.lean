@@ -21,7 +21,7 @@ lean_lib Tests where
   roots := #[`TestUtil]
   globs :=
   #[`TestUtil, `Solver.RegistrationA, `Core.+, `Constraints.+, `Typecheck.+, `Solver.+, `Runtime.+, `Libraries.+, `Cli.+, `LF.+, `LeanHost.Program.A, `LeanHost.+, `Interop.+,
-    `Conformance.Harness]
+    `conformance.Harness]
   needs := #[`@/«lean-elpi»]
 
 @[default_target] lean_exe «lean-elpi» where
