@@ -45,7 +45,7 @@ test_matching_answers_pass() {
   local log status ok=yes
   log="$(LEAN_ELPI="$oracle" CONFORMANCE_DIVERGENCES="$tmp/no-divergences.md" "$run" 2>&1)"; status=$?
   [ "$status" -eq 0 ] || ok=no
-  echo "$log" | grep -q '^pass   append$' || ok=no
+  grep -q '^pass   append$' <<<"$log" || ok=no
   check "matching answers pass" "$ok"
 }
 
@@ -54,9 +54,9 @@ test_divergent_answers_fail_with_a_diff() {
   local log status ok=yes
   log="$(LEAN_ELPI="$tmp/reversing" CONFORMANCE_DIVERGENCES="$tmp/no-divergences.md" "$run" 2>&1)"; status=$?
   [ "$status" -ne 0 ] || ok=no
-  echo "$log" | grep -q '^FAIL   append$' || ok=no
-  echo "$log" | grep -q '^@@ ' || ok=no
-  echo "$log" | grep -q '^exit status: oracle 0, lean-elpi 0$' || ok=no
+  grep -q '^FAIL   append$' <<<"$log" || ok=no
+  grep -q '^@@ ' <<<"$log" || ok=no
+  grep -q '^exit status: oracle 0, lean-elpi 0$' <<<"$log" || ok=no
   check "divergent answers fail with a diff" "$ok"
 }
 
@@ -65,8 +65,8 @@ test_unexpected_oracle_version_is_reported() {
   local log status ok=yes
   log="$(ELPI_ORACLE="$tmp/elpi2" LEAN_ELPI="$oracle" "$run" 2>&1)"; status=$?
   [ "$status" -ne 0 ] || ok=no
-  echo "$log" | grep -q "ELPI 1.18.x is required as oracle, found '2.0.0'" || ok=no
-  echo "$log" | grep -q -E '^(pass|FAIL) ' && ok=no
+  grep -q "ELPI 1.18.x is required as oracle, found '2.0.0'" <<<"$log" || ok=no
+  grep -q -E '^(pass|FAIL) ' <<<"$log" && ok=no
   check "unexpected oracle version is reported" "$ok"
 }
 
@@ -74,10 +74,10 @@ test_unexpected_oracle_version_is_reported() {
 test_registered_divergence_does_not_fail() {
   local log status ok=yes
   log="$(LEAN_ELPI="$tmp/reversing" CONFORMANCE_CORPUS="$here/fixtures/corpus" CONFORMANCE_DIVERGENCES="$here/fixtures/divergences.md" "$run" 2>&1)"; status=$?
-  echo "$log" | grep -q '^known  append (registered divergence)$' || ok=no
+  grep -q '^known  append (registered divergence)$' <<<"$log" || ok=no
   # Only append prints more than one line, so it is the only program the
   # reversing engine changes; with its entry registered nothing may fail.
-  echo "$log" | grep -q '^FAIL ' && ok=no
+  grep -q '^FAIL ' <<<"$log" && ok=no
   [ "$status" -eq 0 ] || ok=no
   check "registered divergence does not fail the suite" "$ok"
 }
