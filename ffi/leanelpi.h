@@ -17,7 +17,7 @@ extern "C" {
 /* Start the Lean runtime. Idempotent; must succeed before any other call. 0 on success. */
 int leanelpi_init(char **err);
 
-/* Library version, e.g. "0.3.2". The pointer is owned by the library. */
+/* Library version, e.g. "0.3.3". The pointer is owned by the library. */
 const char *leanelpi_version(void);
 
 /* Compile an ELPI program text. */

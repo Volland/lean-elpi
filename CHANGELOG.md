@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 — 2026-10-16
 
 ### Added
 - ELPI 1.18 syntax (OpenSpec change `close-compat-gaps`): `macro @name X :- body.`, `pi x y z\ body` and `sigma x y\ body`, blanks before a binder's backslash, a trailing comma in a list, `:index (...)` before a declaration.

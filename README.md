@@ -17,7 +17,7 @@ Add LeanElpi as a Lake dependency (Lean 4.35.0, no Mathlib needed):
 
 ```lean
 -- lakefile.lean
-require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.3.2"
+require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.3.3"
 ```
 
 or in `lakefile.toml`:
@@ -26,7 +26,7 @@ or in `lakefile.toml`:
 [[require]]
 name = "lean-elpi"
 git = "https://github.com/Volland/lean-elpi"
-rev = "v0.3.2"
+rev = "v0.3.3"
 ```
 
 Then `import Elpi`:
@@ -76,7 +76,7 @@ macOS and Linux, no Lean installation needed. Guide: [From Python, Node.js and R
 
 ## Performance and compatibility
 
-Measured against ELPI 1.18 on ELPI's own performance programs (`tests/bench`), all 24 of them now run on the current tree (11 were rejected by 0.3.2). It is about 2.4 times slower by geometric mean over the 20 programs where ELPI takes more than 0.1 s, 6.2 times at worst, and faster than ELPI on `cbv`, on start-up and on the smallest programs; release 0.3.2 was 2.3 times slower on the programs it could read, and 0.3.0 was 31 times. It passes 52 of the 114 upstream ELPI tests that apply and 38 of 40 corpus programs. Memory is 50 to 200 MB, except `map` on lists (1.4 GB: nothing reclaims variables in a long run). Details, the known failures and how to reproduce: the blog posts [compatibility and performance](https://volland.github.io/lean-elpi/blog/compatibility-and-performance/) [why it was slow](https://volland.github.io/lean-elpi/blog/why-leanelpi-was-slow/) and [every performance program runs](https://volland.github.io/lean-elpi/blog/every-performance-program-runs/) and [what we took from ELPI's runtime](https://volland.github.io/lean-elpi/blog/what-we-took-from-elpi/).
+Measured against ELPI 1.18 on ELPI's own performance programs (`tests/bench`), all 24 of them run on release 0.3.3 (11 were rejected by 0.3.2). It is about 2.4 times slower by geometric mean over the 20 programs where ELPI takes more than 0.1 s, 6.2 times at worst, and faster than ELPI on `cbv`, on start-up and on the smallest programs; release 0.3.2 was 2.3 times slower on the programs it could read, and 0.3.0 was 31 times. It passes 52 of the 114 upstream ELPI tests that apply and 38 of 40 corpus programs. Memory is 50 to 200 MB, except `map` on lists (1.4 GB: nothing reclaims variables in a long run). Details, the known failures and how to reproduce: the blog posts [compatibility and performance](https://volland.github.io/lean-elpi/blog/compatibility-and-performance/) [why it was slow](https://volland.github.io/lean-elpi/blog/why-leanelpi-was-slow/) and [every performance program runs](https://volland.github.io/lean-elpi/blog/every-performance-program-runs/) and [what we took from ELPI's runtime](https://volland.github.io/lean-elpi/blog/what-we-took-from-elpi/).
 
 See [CHANGELOG.md](CHANGELOG.md) for releases and [CONTRIBUTING.md](CONTRIBUTING.md) to help.
 
