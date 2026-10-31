@@ -129,6 +129,9 @@ structure CompiledProgram where
   indexSpecs : Std.HashMap Nat (Array Nat) := {}
   /-- The program declared kinds, types or predicates of its own (not just the libraries'). -/
   typed : Bool := false
+  /-- Host predicates declared with `declareHost`, in declaration order: answered by a
+  callback that the caller supplies per run (the C ABI's `leanelpi_solve_host`). -/
+  hostPreds : List BuiltinSig := []
   deriving Inhabited
 
 private def joinErrs (es : List TypeError) : String :=
@@ -641,6 +644,47 @@ def CompiledProgram.withBuiltin (p : CompiledProgram) (name : String) (sigSrc : 
       f (args.map (ctx.store.zonk · ctx.depth))
   return { p with syms, sig, modes := p.modes.insert (syms.find? name).get!.idx modes,
                   extra := b :: p.extra }
+
+/-- Declare `name` as a host predicate: its signature (`sigSrc`, which may also declare the
+kinds and types it mentions) is typechecked into the program, and calls to it are answered
+by a callback given per run. Without a callback a call is a runtime error. The program may
+already declare `name` (so its clauses can call it) but must not define clauses for it. -/
+-- @tg: implements:: [[openspec:language-bindings#Host callback predicates]]
+def CompiledProgram.declareHost (p : CompiledProgram) (name : String) (sigSrc : String) :
+    Except ElpiError CompiledProgram := do
+  let ds ← match Parser.parseProgram "<host>" sigSrc with
+    | .ok ds => pure ds
+    | .error e => throw (.parse e.toString)
+  let defined := match p.syms.find? name with
+    | some c => p.db.preds.contains c
+    | none => false
+  let builtin := (Builtins.core Id).any (·.sig.name == name) || p.extra.any (·.sig.name == name)
+  if defined || builtin then
+    throw (.load s!"host predicate '{name}' clashes with an existing predicate")
+  let mut sig := p.sig
+  for d in ds do
+    match d with
+    | .clause .. | .constraint .. | .accumulate .. =>
+      throw (.load "a host signature may only declare kinds, types and predicates")
+    | _ => match Typecheck.checkSignature sig d with
+      | .ok s => sig := s
+      | .error e => throw (.type e.toString)
+  let declares := ds.any fun d => match d with
+    | .pred n .. => n == name
+    | .type ns .. => ns.contains name
+    | _ => false
+  unless declares do
+    throw (.load s!"the signature does not declare '{name}'")
+  let (c, syms) := p.syms.intern name
+  -- every declared constant gets a symbol, so a host answer may name any of them
+  let syms := sig.consts.fold (init := syms) fun s n _ => (s.intern n).2
+  let modes := (sig.modes[name]?).getD #[]
+  let bsig : BuiltinSig := { name, modes, type := .con "any" [] }
+  let b : Builtin Id :=
+    { sig := bsig
+      run := fun _ _ => .error s!"host predicate '{name}' needs a host callback (leanelpi_solve_host)" }
+  return { p with syms, sig, modes := p.modes.insert c.idx modes,
+                  extra := b :: p.extra, hostPreds := p.hostPreds ++ [bsig] }
 
 /-- Convenience: a builtin with one input and one output computed by a Lean function that
 returns the list of alternatives. -/

@@ -15,6 +15,9 @@ extern lean_object *leanelpi_ffi_assert(uint64_t h, lean_obj_arg clause);
 extern lean_object *leanelpi_ffi_free(uint64_t h);
 extern lean_object *leanelpi_ffi_solve(uint64_t h, lean_obj_arg q, uint64_t limit,
                                        uint64_t fuel);
+extern lean_object *leanelpi_ffi_declare(uint64_t h, lean_obj_arg name, lean_obj_arg sig);
+extern lean_object *leanelpi_ffi_solve_host(uint64_t h, lean_obj_arg q, uint64_t limit,
+                                            uint64_t fuel, size_t fn, size_t ctx);
 extern const lean_object *leanelpi_ffi_version;
 
 static char *dup_cstr(const char *s) {
@@ -103,6 +106,42 @@ char *leanelpi_solve(uint64_t program, const char *query, uint64_t limit, uint64
     ensure_thread();
     lean_object *q = lean_mk_string(query);
     lean_object *res = leanelpi_ffi_solve(program, q, limit, fuel);
+    if (!lean_io_result_is_ok(res)) { take_error(res, err); return NULL; }
+    char *out = dup_cstr(lean_string_cstr(lean_io_result_get_value(res)));
+    lean_dec(res);
+    return out;
+}
+
+uint64_t leanelpi_declare(uint64_t program, const char *name, const char *sig_src, char **err) {
+    ensure_thread();
+    lean_object *n = lean_mk_string(name);
+    lean_object *g = lean_mk_string(sig_src);
+    lean_object *res = leanelpi_ffi_declare(program, n, g);
+    if (!lean_io_result_is_ok(res)) { take_error(res, err); return LEANELPI_INVALID; }
+    uint64_t h = lean_unbox_uint64(lean_io_result_get_value(res));
+    lean_dec(res);
+    return h;
+}
+
+/* Called from Lean (Elpi.Ffi.hostCall, @[extern "leanelpi_host_call"]): run the host
+ * function and hand its answer back as `Option String`; the host's string is freed here. */
+lean_object *leanelpi_host_call(size_t fn, size_t ctx, b_lean_obj_arg name, b_lean_obj_arg args) {
+    leanelpi_host_fn host = (leanelpi_host_fn)fn;
+    char *out = host((void *)ctx, lean_string_cstr(name), lean_string_cstr(args));
+    if (!out) return lean_io_result_mk_ok(lean_box(0));
+    lean_object *s = lean_mk_string(out);
+    free(out);
+    lean_object *some = lean_alloc_ctor(1, 1, 0);
+    lean_ctor_set(some, 0, s);
+    return lean_io_result_mk_ok(some);
+}
+
+char *leanelpi_solve_host(uint64_t program, const char *query, uint64_t limit, uint64_t fuel,
+                          leanelpi_host_fn host, void *ctx, char **err) {
+    ensure_thread();
+    if (!host) { set_err(err, "leanelpi_solve_host: host function is NULL"); return NULL; }
+    lean_object *q = lean_mk_string(query);
+    lean_object *res = leanelpi_ffi_solve_host(program, q, limit, fuel, (size_t)host, (size_t)ctx);
     if (!lean_io_result_is_ok(res)) { take_error(res, err); return NULL; }
     char *out = dup_cstr(lean_string_cstr(lean_io_result_get_value(res)));
     lean_dec(res);

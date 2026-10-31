@@ -323,13 +323,28 @@ Other languages reach the engine through a C interface in which programs are num
 
 **Context.** Python, Node.js and Rust programs should load a program once and query it many times, and install it with `pip`, `npm` or `cargo` on a machine without Lean. Exposing `lean_object*` would make each binding manage Lean reference counts.
 
-**Decision.** `Elpi/Ffi.lean` keeps programs in a handle table inside the Lean runtime and exports seven C functions. `scripts/build-ffi.sh` links the engine and the Lean runtime into one shared library that depends only on system libraries on macOS; on Linux, where the toolchain's static runtime is not position-independent, it links `libleanshared` and ships it beside the library. Python uses `ctypes`, Node.js uses `koffi`, Rust links the library; none needs a compiler on the user's machine except Rust's own.
+**Decision.** `Elpi/Ffi.lean` keeps programs in a handle table inside the Lean runtime and exports seven C functions (nine since 0.4, with [[decisions#Synchronous host callbacks]]). `scripts/build-ffi.sh` links the engine and the Lean runtime into one shared library that depends only on system libraries on macOS; on Linux, where the toolchain's static runtime is not position-independent, it links `libleanshared` and ships it beside the library. Python uses `ctypes`, Node.js uses `koffi`, Rust links the library; none needs a compiler on the user's machine except Rust's own.
 
 **Consequences.** Each binding is a few hundred lines and needs only a JSON parser. Lean-environment builtins (`lean.*`, `elpi_extern`) are unreachable through it, and values are strings. The library is about 150 MB (44 MB compressed), because every `Lean` module is linked in, and starts in about a second. The handle table is updated atomically; a first version that read and wrote it separately gave two threads the same handle, which the Rust concurrency test caught.
 
 - status:: accepted
 - motivated_by:: [[decisions#Monad-generic core and packaging]]
 - introduced_by:: [[changes#add-language-bindings]]
+
+## Synchronous host callbacks
+
+A host predicate declared through the C ABI is answered by one C function pointer and an opaque context, called synchronously on the querying thread, with all rows of one call returned at once as JSON.
+
+**Context.** An embedding program (tiramemsu, first) keeps facts in its own store and wants ELPI rules to read them during a query, without loading every fact as a clause. The boundary carries only integers and strings ([[decisions#Handle-and-string C ABI]]), and the engine already runs builtins in any monad, including `IO`.
+
+**Decision.** `leanelpi_declare` typechecks a signature and records the predicate on the program; `leanelpi_solve_host` builds a `Builtin IO` per declared predicate that sends the arguments as JSON trees (unbound ones as `{"v":..}`) and decodes `{"rows":..}` or `{"error":..}`. One callback receives every host predicate's calls, named, so a binding needs a single trampoline. The answer string is allocated by the host with `malloc` and freed by the library. Rows may hold only constants the program knows, their applications and literals.
+
+**Consequences.** No re-entrancy or threading protocol: the callback runs inside the solve call. Answers are eager per call, so a host predicate with very many rows materialises them all; a streaming protocol can come later without changing the declaration. Through plain `leanelpi_solve` a host predicate is a runtime error rather than a silent failure. Rust closures that panic become errors, because unwinding into C is undefined.
+
+- status:: accepted
+- motivated_by:: [[decisions#Handle-and-string C ABI]]
+- motivated_by:: [[decisions#Monad-generic core and packaging]]
+- introduced_by:: [[changes#add-host-callbacks]]
 
 ## Allocate less than OCaml
 

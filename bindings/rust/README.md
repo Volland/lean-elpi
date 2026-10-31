@@ -13,6 +13,33 @@ for s in p.solve("n X")? {
 # Ok::<(), leanelpi::Error>(())
 ```
 
+Every solution also carries its bindings as terms (`s.terms["X"]`, a [`Term`]), and a program
+can declare **host predicates** that a closure answers during the query:
+
+```rust
+use leanelpi::{Program, Term};
+
+let p = Program::new(
+    "kind node type.\ntype a, b, c node.\n\
+     pred edge i:node, o:node.\npred path i:node, o:node.\n\
+     path X Y :- edge X Y.\npath X Z :- edge X Y, path Y Z.",
+)?
+.declare("edge", "pred edge i:node, o:node.")?;
+let edges = [("a", "b"), ("b", "c")];
+let run = p.solve_host("path a X", 0, 0, |_name, args| {
+    let Term::Const(from) = &args[0] else { return Err("unbound source".into()) };
+    Ok(edges.iter().filter(|e| e.0 == from).map(|e| vec![Term::Const(e.1.into())]).collect())
+})?;
+assert_eq!(run.solutions.len(), 2);            // X = b, X = c
+# Ok::<(), leanelpi::Error>(())
+```
+
+The closure gets the predicate name and one term per argument (unbound ones as `Term::Var`)
+and returns one row per answer, a term for each output-mode argument; `Ok(vec![])` is
+failure and `Err` a runtime error. It runs synchronously on the calling thread; a panic in it
+becomes an error. `HostRun` also reports `exhausted` and `fuel_used`; a run that exceeds its
+fuel fails with an error for which `is_out_of_fuel()` holds.
+
 ## Setup
 
 The crate links the native library `libleanelpi`, which is too large for crates.io. Get it

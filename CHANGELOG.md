@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 — 2026-10-31
+
+### Added
+- Host predicates over the C ABI (OpenSpec change `add-host-callbacks`): `leanelpi_declare` declares a predicate from signature text on a new handle, and `leanelpi_solve_host` answers every call to it through a `leanelpi_host_fn` callback, synchronously on the calling thread. The callback gets the arguments as JSON term trees and returns `{"rows":[[term,...],...]}` (one term per output argument) or `{"error":"..."}` in a `malloc`'d string; `NULL` means no rows. Lean side: `CompiledProgram.declareHost`, `Elpi.Ffi.hostBuiltin`.
+- Structured answers: each solution of `leanelpi_solve` and `leanelpi_solve_host` carries `"terms"`, the bindings as trees (`{"c":..,"a":[..]}`, `{"i":..}`, `{"f":..}`, `{"s":..}`, `{"v":..}`, `{"o":..}`), and both answers report `"fuelUsed"`.
+- Rust crate 0.4.0: `Term` (serde to and from the tree), `Solution::terms`, `HostRun`, `Program::declare`, `Program::solve_host` with a closure (panics become errors), `Error::is_out_of_fuel` and `Error::message`; tests in `bindings/rust/tests/host.rs`.
+- Python package 0.4.0: `Solution.terms` (decoded to `int`, `float`, `str`, `list`, `Const`, `App`, `Var`, `Opaque`), `Program.declare`, `Program.solve_host` / `solve_host_all` (`HostRun`) / `first_host` with a dict of functions of the input arguments or one `host(name, args)` function (exceptions become `ElpiError` with the original as `__cause__`; outputs whose Python type cannot have the declared type are rejected), `ElpiError.out_of_fuel`; tests in `bindings/python/tests/test_host.py`.
+
+### Changed
+- Running out of fuel through the C ABI fails with a message starting with `out of fuel` (was `resource error: out of fuel`).
+- Rust: `Solution` no longer implements `Eq` (it holds `Term`, which can hold a float); `PartialEq` stays.
+
 ## 0.3.3 — 2026-10-16
 
 ### Added

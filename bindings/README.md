@@ -18,5 +18,12 @@ scripts/build-ffi.sh                          # dist/libleanelpi.{dylib,so} and 
 | `node/` | `@lean-elpi/leanelpi` on npm | `koffi`; the library comes from `@lean-elpi/leanelpi-<os>-<cpu>` |
 | `rust/` | `leanelpi` on crates.io | links `libleanelpi` found through `LEANELPI_DIST` |
 
-The requirements and scenarios are in `openspec/changes/add-language-bindings/`; each test
-carries an `@tg: verifies::` comment naming its scenario.
+The C interface is `ffi/leanelpi.h`. Since 0.4 an answer carries each binding twice, printed
+(`bindings`) and as a JSON term tree (`terms`), plus `fuelUsed`; `leanelpi_declare` and
+`leanelpi_solve_host` let the caller answer host predicates through a callback during a
+query. The Rust crate exposes both (`Term`, `Program::solve_host`); Python and Node.js do not
+yet.
+
+The requirements and scenarios are in `openspec/changes/add-language-bindings/` and
+`openspec/changes/add-host-callbacks/`; each test carries an `@tg: verifies::` comment naming
+its scenario.

@@ -11,7 +11,7 @@ LeanElpi is written in Lean, but programs written in other languages can load an
 
 ```
  your code ──► binding ──► libleanelpi (C interface) ──► ELPI engine in Lean
- Python        ctypes        7 functions, handles          + Lean runtime,
+ Python        ctypes        9 functions, handles          + Lean runtime,
  Node.js       koffi         and strings                   in one file
  Rust          extern "C"
 ```
@@ -19,8 +19,13 @@ LeanElpi is written in Lean, but programs written in other languages can load an
 Only integers and strings cross the boundary. A program lives inside the Lean runtime and your code holds a numeric *handle* to it. Loading, asserting a clause and running a query are calls on that handle. A query returns JSON text with one object per solution: the query variables with their values as ELPI prints them, and any constraints still suspended.
 
 ```json
-{"solutions":[{"bindings":{"R":"[1, 2, 3]"},"constraints":[]}],"exhausted":true}
+{"solutions":[{"bindings":{"R":"[1, 2, 3]"},
+               "terms":{"R":{"c":"::","a":[{"i":1},{"c":"::","a":[{"i":2},{"c":"::","a":[{"i":3},{"c":"[]"}]}]}]}},
+               "constraints":[]}],
+ "exhausted":true,"fuelUsed":3}
 ```
+
+`terms` holds the same values as trees: `{"c":name}` a constant, `{"c":name,"a":[...]}` a constant applied, `{"i":..}`, `{"f":..}` and `{"s":..}` literals, `{"v":name}` an unassigned variable and `{"o":printed}` anything else, such as a λ-term.
 
 `exhausted` is `false` when a limit you set stopped the search before the last solution.
 
@@ -30,7 +35,7 @@ A machine needs no Lean installation. On macOS the native library is a single fi
 
 ### What you get, and what you do not
 
-You get the engine, the standard library, typed clauses, modes, constraints and CHR. You do not get the Lean-facing builtins (`lean.*`, `{{ … }}`, `elpi_extern`): they need a Lean environment and stay in the Lean host. Values come back as strings, so decode them in your own code.
+You get the engine, the standard library, typed clauses, modes, constraints and CHR. You do not get the Lean-facing builtins (`lean.*`, `{{ … }}`, `elpi_extern`): they need a Lean environment and stay in the Lean host. Values come back as strings and, since 0.4, as JSON term trees; host predicates are answered by a C callback, which only the Rust binding wraps so far.
 
 ## Install
 
@@ -131,6 +136,33 @@ fn main() -> Result<(), leanelpi::Error> {
 ```
 
 `Program` is `Send` and `Sync`, so an `Arc<Program>` can serve queries from many threads at once. Dropping a `Program` frees its handle.
+
+### Host predicates
+
+A Rust program can answer predicates itself while a query runs, for example to let ELPI rules read facts that live in the program's own store. Declare the predicate on a program, then pass a closure to `solve_host`:
+
+```rust
+use leanelpi::{Program, Term};
+
+let p = Program::new(
+    "kind node type.\ntype a, b, c node.\n\
+     pred edge i:node, o:node.\npred path i:node, o:node.\n\
+     path X Y :- edge X Y.\npath X Z :- edge X Y, path Y Z.",
+)?
+.declare("edge", "pred edge i:node, o:node.")?;
+let edges = [("a", "b"), ("b", "c")];
+let run = p.solve_host("path a X", 0, 0, |_name, args| {
+    let Term::Const(from) = &args[0] else { return Err("unbound source".into()) };
+    Ok(edges.iter().filter(|e| e.0 == from).map(|e| vec![Term::Const(e.1.into())]).collect())
+})?;
+for s in &run.solutions {
+    println!("{:?}", s.terms["X"]);                 // Const("b"), Const("c")
+}
+```
+
+The closure receives the predicate's name and its arguments as `Term`s (unbound ones as `Term::Var`) and returns one row per answer, holding a term for each output-mode argument in order. An empty list is failure; `Err(message)` stops the run with an error, and so does a panic. Rows may contain constants the program knows, applications of them and literals. The closure runs on the calling thread, inside `solve_host`; all rows of one call are collected before the search goes on. A query that reaches a host predicate through plain `solve` is an error. When fuel runs out, the error's `is_out_of_fuel()` is true; a finished run reports `fuel_used`.
+
+In C the same pair is `leanelpi_declare` and `leanelpi_solve_host` with a `leanelpi_host_fn` callback, which returns a `malloc`'d JSON string, `{"rows":[[term,...],...]}` or `{"error":"..."}`, that the library frees.
 
 To ship a Rust binary, put `libleanelpi` (and, on Linux, the `libleanshared` files from the same archive) next to it and link with `-C link-arg=-Wl,-rpath,@executable_path` on macOS or `-Wl,-rpath,$ORIGIN` on Linux (for example from your own `build.rs`).
 

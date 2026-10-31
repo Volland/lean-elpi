@@ -63,6 +63,15 @@ Depends on [[changes#add-elpi-core]]. Capability: `language-bindings`. Files: `o
 - status:: implemented
 - milestone:: Bindings
 
+## add-host-callbacks
+
+Release 0.4.0: host predicates answered by a C callback during a query, structured answer terms, `fuelUsed`, and out-of-fuel errors that callers can tell apart; the Rust binding exposes them as `Term`, `Program::declare` and `Program::solve_host`.
+
+Depends on [[changes#add-language-bindings]]. Capability: `language-bindings` (requirements "Host callback predicates" and "Structured answers"). Motivated by [[decisions#Synchronous host callbacks]]. Files: `openspec/changes/add-host-callbacks/`.
+
+- status:: implemented
+- milestone:: Bindings
+
 ## optimize-clause-selection
 
 Compiled clauses, prepared candidate arrays, hypotheses indexed by predicate and key, fused relocation in dereferencing, and fewer per-step allocations in head matching and unification.

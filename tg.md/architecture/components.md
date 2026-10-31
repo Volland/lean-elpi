@@ -357,21 +357,26 @@ A handle-and-string C interface over the runtime API, so any language with a C F
 
 Programs live in a handle table inside the Lean runtime, updated atomically, so handles can be used from several threads. The shim starts the runtime, attaches each calling thread to it and turns Lean `IO` results into error strings. `build-ffi.sh` links the engine and the Lean runtime into one shared library (macOS) or ships `libleanshared` beside it (Linux). Lean-environment builtins are not reachable through it.
 
+Since 0.4 every solution also carries `terms`, its bindings as JSON trees (`c`/`a`, `i`, `f`, `s`, `v`, `o`), and answers report `fuelUsed`; running out of fuel is an error whose message starts with `out of fuel`. `leanelpi_declare` adds a host predicate (`CompiledProgram.declareHost` records it in `hostPreds` and installs a placeholder builtin that errors). `leanelpi_solve_host` replaces the placeholders with `Builtin IO` entries (`Elpi.Ffi.hostBuiltin`) that call the host through the `@[extern]` `hostCall`, implemented by `leanelpi_host_call` in the shim, and runs the query in `IO`. A row's terms are decoded against the program's symbols, so an unknown constant is an error.
+
 - module:: Elpi.Ffi
 - depends_on:: [[components#Runtime API]]
 - motivated_by:: [[decisions#Handle-and-string C ABI]]
+- motivated_by:: [[decisions#Synchronous host callbacks]]
 - introduced_by:: [[changes#add-language-bindings]]
+- changed_by:: [[changes#add-host-callbacks]]
 
 ## Language bindings
 
 Python (`ctypes`), Node.js (`koffi`) and Rust packages over the C ABI, in `bindings/`, released together from one version tag by `.github/workflows/release.yml`.
 
-Each is a thin wrapper: a `Program` class with `first`, `solve`, `ask` and persistent `assert`. Distribution is the hard part: platform wheels, per-platform npm packages with a loader, and a crate that links a library fetched separately. Versions are kept equal by `scripts/check-versions.sh`; the release steps are in `PUBLISHING.md`.
+Each is a thin wrapper: a `Program` class with `first`, `solve`, `ask` and persistent `assert`. The Rust crate also decodes `terms` into `leanelpi::Term` and answers host predicates with a closure (`Program::declare`, `Program::solve_host`), through an `extern "C"` trampoline that catches panics and allocates answers with `malloc`. Distribution is the hard part: platform wheels, per-platform npm packages with a loader, and a crate that links a library fetched separately. Versions are kept equal by `scripts/check-versions.sh`; the release steps are in `PUBLISHING.md`.
 
 - module:: bindings
 - depends_on:: [[components#C ABI]]
 - motivated_by:: [[decisions#Handle-and-string C ABI]]
 - introduced_by:: [[changes#add-language-bindings]]
+- changed_by:: [[changes#add-host-callbacks]]
 
 ## Conformance harness
 
