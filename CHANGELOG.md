@@ -7,10 +7,14 @@
 - Structured answers: each solution of `leanelpi_solve` and `leanelpi_solve_host` carries `"terms"`, the bindings as trees (`{"c":..,"a":[..]}`, `{"i":..}`, `{"f":..}`, `{"s":..}`, `{"v":..}`, `{"o":..}`), and both answers report `"fuelUsed"`.
 - Rust crate 0.4.0: `Term` (serde to and from the tree), `Solution::terms`, `HostRun`, `Program::declare`, `Program::solve_host` with a closure (panics become errors), `Error::is_out_of_fuel` and `Error::message`; tests in `bindings/rust/tests/host.rs`.
 - Python package 0.4.0: `Solution.terms` (decoded to `int`, `float`, `str`, `list`, `Const`, `App`, `Var`, `Opaque`), `Program.declare`, `Program.solve_host` / `solve_host_all` (`HostRun`) / `first_host` with a dict of functions of the input arguments or one `host(name, args)` function (exceptions become `ElpiError` with the original as `__cause__`; outputs whose Python type cannot have the declared type are rejected), `ElpiError.out_of_fuel`; tests in `bindings/python/tests/test_host.py`.
+- Host API `Elpi.Host` (OpenSpec change `add-host-api`): `predSig?`, `loadUnits` with located diagnostics, `buildGoal` from terms, `runSlice`/`solveSliced` with resumable fuel slices and structured `ResultTerm` solutions (with a JSON form), `addFacts` for ground facts as terms, and `ast`, a public clause AST. Proofs: `ResultTerm.json_roundtrip`, `TyTerm.beq_iff_eq`, `addFacts_atomic`.
+- `Step.paused` and `Machine.reserve`: a run in slices pauses at a slice boundary and resumes the same search.
+- `CompiledProgram.addDeclsAt`: type errors with their positions.
 
 ### Changed
 - Running out of fuel through the C ABI fails with a message starting with `out of fuel` (was `resource error: out of fuel`).
 - Rust: `Solution` no longer implements `Eq` (it holds `Term`, which can hold a float); `PartialEq` stays.
+- `PredDB.ofArray` groups clauses by first-argument key in linear time; loading many clauses that share a key was quadratic (10⁶ facts: 486 s to 1 s).
 
 ## 0.3.3 — 2026-10-16
 

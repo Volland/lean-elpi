@@ -3,7 +3,7 @@ type: Decision
 status: accepted  # per section: see each status:: line
 date: 2026-10-14
 owner: Volodymyr Pavlyshyn
-openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop, language-bindings]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop, language-bindings, elpi-host-api]
 ---
 # Decisions
 
@@ -359,3 +359,17 @@ The engine closes its speed gap with ELPI by allocating fewer objects than ELPI 
 - status:: accepted
 - motivated_by:: [[decisions#Native Lean engine]]
 - introduced_by:: [[changes#optimize-clause-selection]]
+
+## Pause through a fuel reserve
+
+A run in slices keeps the fuel beyond the current slice in a reserve; when the slice's fuel reaches zero with a reserve left, the machine pauses instead of running out.
+
+**Context.** A host that runs ELPI inside a database must check for cancellation and deadlines while a query runs, so it needs a query that stops after a number of steps and resumes. `Step.outOfFuel` dropped the machine. The store must stay uniquely owned while the machine runs ([[decisions#Persistent store]]), so the pause has to come from inside `runLoopS`, not from a host loop around `stepM`.
+
+**Decision.** `Machine` gains `reserve`. `Host.runSlice` sets `fuel` to the slice and `reserve` to the rest of the budget; `stepM` returns `paused` with the machine, before consuming the goal, when `fuel` is zero and `reserve` is not. Nested runs (`findall`, CHR guards) receive the whole remaining budget and hand back what they leave with `refuel`, which keeps the slice boundary.
+
+**Consequences.** Slices of any size give the same answers, and the whole budget runs out at the same step, as one run; `tests/Host/Slices.lean` checks it. The check costs nothing per step, and slices of 1000 steps run as fast as one run (`tests/Core/Scaling.lean`). A nested `findall` finishes inside the slice that starts it, so that slice can be longer than asked.
+
+- status:: accepted
+- date:: 2026-10-31
+- motivated_by:: [[decisions#Persistent store]]

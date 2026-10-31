@@ -142,20 +142,29 @@ typecheck every clause, lower clauses and rebuild the clause database. -/
 def CompiledProgram.definedNames (p : CompiledProgram) : Std.HashSet String :=
   p.items.foldl (fun s it => s.insert (p.syms.name it.pred)) {}
 
-def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
-    Except ElpiError CompiledProgram := do
+/-- Why `addDeclsAt` rejected declarations: type errors keep their source positions. -/
+inductive AddError where
+  | type (errs : List TypeError)
+  | other (e : ElpiError)
+
+instance : MonadLift (Except ElpiError) (Except AddError) :=
+  ⟨fun | .ok a => .ok a | .error e => .error (.other e)⟩
+
+/-- `addDecls` with positioned type errors, for front ends that report them structurally. -/
+def CompiledProgram.addDeclsAt (p : CompiledProgram) (decls : List Decl) :
+    Except AddError CompiledProgram := do
   let mut sig := p.sig
   for d in decls do
     match checkSignature' sig d with
     | .ok s => sig := s
-    | .error e => throw (.type e.toString)
+    | .error e => throw (.type [e])
   let mut clauses : Array (Attrs × STm × Pos) := #[]
   for d in decls do
     if let .clause a t pos := d then
       if let some q := findQuote t then
-        throw (.load s!"{q.toString}: Lean quotations need a Lean environment (use elpi_accumulate or #elpi)")
+        throw (.other (.load s!"{q.toString}: Lean quotations need a Lean environment (use elpi_accumulate or #elpi)"))
       if let some (q, what) := unsupportedFeature t then
-        throw (.load s!"{q.toString}: '{what}' is unsupported in this milestone")
+        throw (.other (.load s!"{q.toString}: '{what}' is unsupported in this milestone"))
       clauses := clauses.push (a, elimSpilling t, pos)
   -- the terms of a CHR rule are checked like one clause body (they share variables)
   let mut ruleTerms : List STm := []
@@ -173,11 +182,11 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
     | .kind .. | .type .. | .pred .. => true
     | _ => false
   let warns ← match Typecheck.checkProgram sig (clauses.toList.map (·.2.1) ++ ruleTerms) none known typed with
-    | .error es => throw (.type (joinErrs es))
+    | .error es => throw (.type es)
     | .ok ws => pure (ws.map TypeError.toString)
   let (items, ls) := (clauses.mapM fun (a, t, pos) => lowerClause a t pos).run { syms := p.syms }
   let items := p.items ++ items.filterMap id
-  let lists ← graft items
+  let lists ← (graft items : Except ElpiError _)
   let mut ls := ls
   let mut blocks := p.blocks
   for d in decls do
@@ -191,7 +200,7 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
       for k in h.keys do
         if let some c := ls.syms.find? k then
           if b.preds.contains c then
-            throw (.load s!"constraint block over '{k}', which the native handler '{hn}' owns")
+            throw (.other (.load s!"constraint block over '{k}', which the native handler '{hn}' owns"))
   let modes := sig.modes.fold (init := p.modes) fun m n ms =>
     match ls.syms.find? n with
     | some c => m.insert c.idx ms
@@ -206,6 +215,13 @@ def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
 where
   checkSignature' (sig : Signature) (d : Decl) : Except TypeError Signature :=
     Typecheck.checkSignature sig d
+
+def CompiledProgram.addDecls (p : CompiledProgram) (decls : List Decl) :
+    Except ElpiError CompiledProgram :=
+  match p.addDeclsAt decls with
+  | .ok q => .ok q
+  | .error (.type es) => .error (.type (joinErrs es))
+  | .error (.other e) => .error e
 
 /-- The prelude and standard library, parsed once. -/
 def stdDecls : Except ElpiError (List Decl) :=
@@ -397,7 +413,7 @@ where
     | .yield sol M' =>
       .cons (.ok (mkSolution syms names sol)) (Thunk.mk fun _ => go env syms names M')
     | .exhausted _ _ => .nil
-    | .outOfFuel => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
+    | .outOfFuel | .paused _ => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
     | .error e => .cons (.error e) (Thunk.mk fun _ => .nil)
 
 /-- A stream in `IO`: each call to `next` computes one more solution. -/
@@ -423,7 +439,7 @@ def solveIO (p : CompiledProgram) (q : String) (fuel : Nat := defaultFuel) :
           ref.set (some M')
           return some (mkSolution prep.syms prep.names sol)
         | .exhausted _ _ => ref.set none; return none
-        | .outOfFuel => ref.set none; throw (IO.userError (toString ElpiError.outOfFuel))
+        | .outOfFuel | .paused _ => ref.set none; throw (IO.userError (toString ElpiError.outOfFuel))
         | .error e => ref.set none; throw (IO.userError (toString e)) }
 
 /-! ### Typed decoding -/
@@ -717,7 +733,7 @@ def runPrepared {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ] [
       match ← runLoop env cur with
       | .yield sol M' => out := out.push (mkSolution prep.syms prep.names sol); cur := M'
       | .exhausted _ _ => break
-      | .outOfFuel => return .error .outOfFuel
+      | .outOfFuel | .paused _ => return .error .outOfFuel
       | .error e => return .error e
     return .ok out.toList
 

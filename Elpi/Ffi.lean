@@ -193,7 +193,7 @@ private def collect (p : CompiledProgram) (query : String) (limit fuel : UInt64)
       cur := M'
       left := M'.fuel
     | .exhausted _ f => left := f; break
-    | .outOfFuel => throw (IO.userError s!"out of fuel: the budget of {budget} steps ran out")
+    | .outOfFuel | .paused _ => throw (IO.userError s!"out of fuel: the budget of {budget} steps ran out")
     | .error e => throw (IO.userError (toString e))
   return (Json.mkObj [("solutions", Json.arr out), ("exhausted", Json.bool exhausted),
                       ("fuelUsed", Json.num (JsonNumber.fromNat (budget - left)))]).compress

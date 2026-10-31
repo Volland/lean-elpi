@@ -56,11 +56,23 @@ structure Machine (σ : Type) where
   choices : Array (ChoicePoint σ) := #[]
   store : Store := {}
   fuel : Nat := 100000000
+  /-- Fuel held back beyond the current slice: when `fuel` reaches zero with a reserve left,
+  the machine pauses instead of running out. A run without slices keeps it at zero. -/
+  reserve : Nat := 0
   /-- The previous solution was yielded: the next step backtracks. -/
   resume : Bool := false
   /-- Some LF goal was pruned by the depth bound (not undone by backtracking). -/
   cutoff : Bool := false
   deriving Inhabited
+
+/-- All the fuel the machine may still spend: the slice plus the reserve. -/
+@[inline] def Machine.totalFuel {σ : Type} (M : Machine σ) : Nat := M.fuel + M.reserve
+
+/-- Give a nested run's leftover total fuel back to the outer machine, keeping the slice
+boundary: a nested run that crossed it leaves the outer slice empty, so it pauses next step. -/
+@[inline] def Machine.refuel {σ : Type} (M : Machine σ) (left : Nat) : Machine σ :=
+  if left ≥ M.reserve then { M with fuel := left - M.reserve }
+  else { M with fuel := 0, reserve := left }
 
 /-- Take the store out of the machine (leaving an empty one) so the caller holds the only
 reference and the store's arrays are updated in place rather than copied. -/
@@ -96,6 +108,9 @@ inductive Step (σ : Type) where
   /-- The search space is exhausted; `cutoff` tells whether a depth bound pruned anything. -/
   | exhausted (cutoff : Bool) (fuel : Nat)
   | outOfFuel
+  /-- The slice's fuel ran out with fuel still in reserve: `resume` continues the same search
+  (see `Machine.reserve`). -/
+  | paused (resume : Machine σ)
   | error (e : ElpiError)
 
 /-- Result of one machine step. While the machine runs, its store travels beside it as its own
@@ -437,7 +452,7 @@ the failed branch ended with; the choice point's checkpoint undoes it. -/
 -- @tg: implements:: [[openspec:elpi-core-engine#Depth-first search order]]
 partial def backtrack {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
     (env : Env m) (M : Machine σ) (cur : Store) : m (SR σ) := do
-  let some cp := M.choices.back? | return .done (.exhausted M.cutoff M.fuel)
+  let some cp := M.choices.back? | return .done (.exhausted M.cutoff M.totalFuel)
   let choices := M.choices.pop
   Backtrackable.restore cp.host
   let s := cur.undo cp.store
@@ -497,14 +512,14 @@ partial def runGuard {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m 
   let st := { mt.store with protect := mt.store.nextVar }
   let sub : Machine σ :=
     { goals := [{ goal := gt, depth := c.depth, locals := c.locals, cutTo := 0 }],
-      store := st, fuel := M.fuel }
+      store := st, fuel := M.totalFuel }
   let host ← Backtrackable.save
   let r ← runLoop env sub
   Backtrackable.restore host
   match r with
   | .yield sol _ => return .ok (some { sol.store with protect := 0 })
   | .exhausted _ _ => return .ok none
-  | .outOfFuel => return .error .outOfFuel
+  | .outOfFuel | .paused _ => return .error .outOfFuel
   | .error e => return .error (.error e)
 
 /-- Activate a newly added constraint: try the rules of every block over its predicate, in
@@ -606,7 +621,10 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
     -- solution: whatever is still suspended is reported with it
     return .done (.yield { store := s, constraints := s.cstore.toList } { M with store := s, resume := true })
   | f :: rest =>
-    if M.fuel == 0 then return .done .outOfFuel
+    if M.fuel == 0 then
+      -- the goal is not consumed yet, so resuming retries it
+      if M.reserve == 0 then return .done .outOfFuel
+      return .done (.paused { M with store := s })
     let M := { M with fuel := M.fuel - 1 }
     let d := f.depth
     let goal := s.deref f.goal d
@@ -682,13 +700,13 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
         let host ← Backtrackable.save
         let nv0 := s.nextVar
         let sub : Machine σ :=
-          { goals := [{ f with goal := args[0]!, cutTo := 0 }], store := s, fuel := M.fuel }
+          { goals := [{ f with goal := args[0]!, cutTo := 0 }], store := s, fuel := M.totalFuel }
         let mut cur := sub
         let mut outer := s
         let mut mp : Std.HashMap Nat UVarId := {}
         let mut items : Array Term := #[]
         let mut err : Option (Step σ) := none
-        let mut fuelLeft := M.fuel
+        let mut fuelLeft := M.totalFuel
         repeat
           match ← runLoop env cur with
           | .yield sol resume =>
@@ -700,7 +718,7 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
             fuelLeft := resume.fuel
             cur := resume
           | .exhausted _ _ => break
-          | .outOfFuel => err := some .outOfFuel; break
+          | .outOfFuel | .paused _ => err := some .outOfFuel; break
           | .error e => err := some (.error e); break
         Backtrackable.restore host
         match err with
@@ -708,7 +726,7 @@ partial def stepM {m : Type → Type} {σ : Type} [Monad m] [Backtrackable m σ]
         | none =>
           let lst := items.foldr (fun x acc => Term.app (.const cCons) #[x, acc]) (.const cNil)
           match unify outer args[1]! lst d with
-          | some s'' => return .cont { M with goals := rest, fuel := fuelLeft } s''
+          | some s'' => return .cont { M.refuel fuelLeft with goals := rest } s''
           | none => backtrack env { M with goals := rest } s
       else callPred env M s f c args rest
     | .uvar .. => return .done (.error (.runtime "uninstantiated goal"))
