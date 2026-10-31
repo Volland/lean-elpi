@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-14,        wheel_plat: macosx_11_0_arm64,        name: darwin-arm64 }
+          - { os: macos-15,        wheel_plat: macosx_11_0_arm64,        name: darwin-arm64 }
           - { os: macos-15-intel,  wheel_plat: macosx_11_0_x86_64,       name: darwin-x64 }
           - { os: ubuntu-22.04,    wheel_plat: manylinux_2_35_x86_64,    name: linux-x64 }
           - { os: ubuntu-22.04-arm, wheel_plat: manylinux_2_35_aarch64,  name: linux-arm64 }
