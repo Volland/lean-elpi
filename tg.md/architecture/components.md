@@ -1,6 +1,6 @@
 ---
 type: Component
-openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop, language-bindings]
+openspec: [elpi-core-engine, elpi-typechecker, elpi-constraints, elpi-solver-api, lean-reflection, lean-integration, elpi-runtime-library, elpi-libraries, elpi-cli, elpi-conformance, elpi-lf, lean-interop, language-bindings, elpi-host-api]
 ---
 # Components
 
@@ -173,6 +173,19 @@ The library for ordinary Lean programs: pure lazy `Elpi.solve`, `solveIO`, `solv
 - depends_on:: [[components#Solver registry]]
 - motivated_by:: [[decisions#Monad-generic core and packaging]]
 - introduced_by:: [[changes#add-elpi-core]]
+
+## Host API
+
+The stable surface for programs that embed LeanElpi as a library, behind one module. Source: `Elpi/Host.lean`, `Elpi/Host/Types.lean`, `Elpi/Host/Ast.lean`.
+
+It offers predicate signatures, multi-unit loading with located errors, goals built from terms, resumable fuel slices with structured result terms, bulk facts as terms, and a public clause AST.
+
+- module:: Elpi.Host
+- depends_on:: [[components#Runtime API]]
+- depends_on:: [[components#Abstract machine]]
+- depends_on:: [[components#Clause index]]
+- motivated_by:: [[decisions#Pause through a fuel reserve]]
+- introduced_by:: [[changes#add-host-api]]
 
 ## Rule DSL
 

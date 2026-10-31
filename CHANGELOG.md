@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Host API `Elpi.Host` (OpenSpec change `add-host-api`): `predSig?`, `loadUnits` with located diagnostics, `buildGoal` from terms, `runSlice`/`solveSliced` with resumable fuel slices and structured `ResultTerm` solutions (with a JSON form), `addFacts` for ground facts as terms, and `ast`, a public clause AST. Proofs: `ResultTerm.json_roundtrip`, `TyTerm.beq_iff_eq`, `addFacts_atomic`.
+- `Step.paused` and `Machine.reserve`: a run in slices pauses at a slice boundary and resumes the same search.
+- `CompiledProgram.addDeclsAt`: type errors with their positions.
+
+### Changed
+- `PredDB.ofArray` groups clauses by first-argument key in linear time; loading many clauses that share a key was quadratic (10⁶ facts: 486 s to 1 s).
+
 ## 0.3.3 — 2026-10-16
 
 ### Added

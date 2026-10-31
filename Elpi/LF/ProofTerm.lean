@@ -238,7 +238,7 @@ partial def lfSearch (judg : Std.HashSet Nat) (famName : String) (tmpl : Array T
       match strategy.next? cutoff with
       | some s' => lfSearch judg famName tmpl baseEnv syms names s' { M0 with fuel }
       | none => .nil
-    | .outOfFuel => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
+    | .outOfFuel | .paused _ => .cons (.error .outOfFuel) (Thunk.mk fun _ => .nil)
     | .error e => .cons (.error e) (Thunk.mk fun _ => .nil)
   go M0
 

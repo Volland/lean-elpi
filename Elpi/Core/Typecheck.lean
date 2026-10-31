@@ -39,6 +39,8 @@ def tyProp : Ty := .con "prop" []
 structure Scheme where
   nvars : Nat
   ty : Ty
+  /-- The declared names of the quantified variables, by `gen` index. -/
+  varNames : Array String := #[]
   deriving Inhabited
 
 structure Abbrev where
@@ -147,7 +149,7 @@ def checkSignature (sig : Signature) : Decl → Except TypeError Signature
     return { sig with abbrevs := sig.abbrevs.insert name { params, body } }
   | .type names ty _ => do
     let (t, vars) ← expandAbbrev sig ty #[]
-    let sc : Scheme := { nvars := vars.size, ty := t }
+    let sc : Scheme := { nvars := vars.size, ty := t, varNames := vars }
     return names.foldl (fun s n =>
       match s.consts[n]? with
       | some old =>
@@ -163,7 +165,7 @@ def checkSignature (sig : Signature) : Decl → Except TypeError Signature
       vars := v; tys := tys.push t
     let ty := tys.foldr (fun a acc => .arrow a acc) tyProp
     return { sig with
-      consts := sig.consts.insert name { nvars := vars.size, ty },
+      consts := sig.consts.insert name { nvars := vars.size, ty, varNames := vars },
       modes := sig.modes.insert name (args.map (·.1)).toArray,
       indexes := if index.isEmpty then sig.indexes else sig.indexes.insert name index.toArray }
   | _ => return sig

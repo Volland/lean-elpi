@@ -1,4 +1,5 @@
 import Elpi.Core.Builtins
+import Elpi.Host
 import Elpi.Core.CHR
 import Elpi.Core.Constraints
 import Elpi.Core.Index

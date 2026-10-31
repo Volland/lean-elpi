@@ -211,14 +211,22 @@ def ofArray (cs : Array Clause) (spec : Array Nat := #[]) : PredDB := Id.run do
     if spec.isEmpty then c else { c with ihash := indexHashes id spec c.args }
   let keys := cs.map (firstKey ·.head)
   -- positions of each key, ascending
-  let mut pos : Std.HashMap Key (Array Nat) := {}
+  -- the positions of each key live in `groups`, owned by nobody else, so `modify` pushes in
+  -- place; pushing onto an array still held by a map would copy it at every clause
+  let mut slot : Std.HashMap Key Nat := {}
+  let mut groups : Array (Key × Array Nat) := #[]
   let mut flexPos : Array Nat := #[]
   for i in [0:cs.size] do
     match keys[i]! with
     | .flex => flexPos := flexPos.push i
-    | k => pos := pos.insert k ((pos.getD k #[]).push i)
+    | k =>
+      match slot[k]? with
+      | some j => groups := groups.modify j fun (k, ps) => (k, ps.push i)
+      | none =>
+        slot := slot.insert k groups.size
+        groups := groups.push (k, #[i])
   let mut byKey : Lean.PersistentHashMap Key (Array Clause) := {}
-  for (k, ps) in pos.toList do
+  for (k, ps) in groups do
     -- ordered merge of the key's positions with the variable-headed ones
     let mut out : Array Clause := Array.mkEmpty (ps.size + flexPos.size)
     let mut i := 0
