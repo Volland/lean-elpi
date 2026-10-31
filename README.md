@@ -17,7 +17,7 @@ Add LeanElpi as a Lake dependency (Lean 4.35.0, no Mathlib needed):
 
 ```lean
 -- lakefile.lean
-require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.4.0"
+require «lean-elpi» from git "https://github.com/Volland/lean-elpi" @ "v0.4.1"
 ```
 
 or in `lakefile.toml`:
@@ -26,7 +26,7 @@ or in `lakefile.toml`:
 [[require]]
 name = "lean-elpi"
 git = "https://github.com/Volland/lean-elpi"
-rev = "v0.4.0"
+rev = "v0.4.1"
 ```
 
 Then `import Elpi`:

@@ -65,9 +65,9 @@ Depends on [[changes#add-elpi-core]]. Capability: `language-bindings`. Files: `o
 
 ## add-host-callbacks
 
-Release 0.4.0: host predicates answered by a C callback during a query, structured answer terms, `fuelUsed`, and out-of-fuel errors that callers can tell apart; the Rust binding exposes them as `Term`, `Program::declare` and `Program::solve_host`.
+Release 0.4.1: host predicates answered by a C callback during a query, structured answer terms, `fuelUsed`, and out-of-fuel errors that callers can tell apart; the Rust binding exposes them as `Term`, `Program::declare` and `Program::solve_host`.
 
-Depends on [[changes#add-language-bindings]]. Capability: `language-bindings` (requirements "Host callback predicates" and "Structured answers"). Motivated by [[decisions#Synchronous host callbacks]]. Files: `openspec/changes/add-host-callbacks/`.
+Depends on [[changes#add-language-bindings]]. Capability: `language-bindings` (requirements "Host callback predicates" and "Structured answers"). Motivated by [[decisions#Synchronous host callbacks]]. Files: `openspec/changes/add-host-callbacks/`. The tag `v0.4.0` was never published (its macOS build ran on a retired runner image).
 
 - status:: implemented
 - milestone:: Bindings
@@ -85,7 +85,7 @@ Follows the archived `optimize-engine-store`. Capability: `elpi-core-engine` (fi
 
 The host-facing Lean API (`Elpi.Host`): predicate signatures, goals built from terms, structured result terms with a proved JSON round trip, resumable fuel slices, bulk facts as terms, multi-unit loading with located errors, and a public clause AST.
 
-Depends on [[changes#add-elpi-core]]. Capability: `elpi-host-api`. Requested by Marien (its change `add-leanelpi-host-api`, capability `engine-host-api`). Files: `openspec/changes/add-host-api/`. Released in 0.4.0 together with [[changes#add-host-callbacks]].
+Depends on [[changes#add-elpi-core]]. Capability: `elpi-host-api`. Requested by Marien (its change `add-leanelpi-host-api`, capability `engine-host-api`). Files: `openspec/changes/add-host-api/`. Released in 0.4.1 together with [[changes#add-host-callbacks]].
 
 - status:: applied
 - date:: 2026-10-31
