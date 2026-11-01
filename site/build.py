@@ -178,7 +178,7 @@ def main():
         f'<li><a href="{BASE}/book/{m["slug"]}/"><strong>{html.escape(m["title"])}</strong></a><br>{html.escape(m.get("summary",""))}</li>'
         for m, _ in chapters)
     write("book/index.html", page("The λProlog book",
-        f"<h1>λProlog and LeanElpi: a short book</h1><p>A hands-on introduction to λProlog, to its implementation in Lean 4, and to why higher-order logic matters for neuro-symbolic systems. Read it in order, or jump to the chapter you need.</p><ol class=chapters>{cards}</ol>",
+        f"<h1>λProlog and LeanElpi: a short book</h1><p>A hands-on introduction to λProlog, to its implementation in Lean 4, and to why higher-order logic matters for neuro-symbolic systems. Read it in order, or jump to the chapter you need. New to logic programming? Start with <a href='https://volland.github.io/little-elpier/'><em>The Little Elpier</em></a>, a gentle book in questions and answers.</p><ol class=chapters>{cards}</ol>",
         "/book/", desc="A short book on λProlog, ELPI, and LeanElpi."))
     for n, (m, body) in enumerate(chapters):
         prev = chapters[n - 1][0] if n else None

@@ -18,16 +18,20 @@
 <p>LeanElpi is written in Lean, but programs written in other languages can load an ELPI program once, add clauses to it and query it many times. Three bindings do this: <code>pip install leanelpi</code>, <code>npm install @lean-elpi/leanelpi</code> and the <code>leanelpi</code> crate. All three sit on one native library.</p>
 <h2 id="how-it-works">How it works</h2>
 <pre><code> your code ──► binding ──► libleanelpi (C interface) ──► ELPI engine in Lean
- Python        ctypes        7 functions, handles          + Lean runtime,
+ Python        ctypes        9 functions, handles          + Lean runtime,
  Node.js       koffi         and strings                   in one file
  Rust          extern &quot;C&quot;</code></pre>
 <p>Only integers and strings cross the boundary. A program lives inside the Lean runtime and your code holds a numeric <em>handle</em> to it. Loading, asserting a clause and running a query are calls on that handle. A query returns JSON text with one object per solution: the query variables with their values as ELPI prints them, and any constraints still suspended.</p>
-<pre><code class="language-json">{&quot;solutions&quot;:[{&quot;bindings&quot;:{&quot;R&quot;:&quot;[1, 2, 3]&quot;},&quot;constraints&quot;:[]}],&quot;exhausted&quot;:true}</code></pre>
+<pre><code class="language-json">{&quot;solutions&quot;:[{&quot;bindings&quot;:{&quot;R&quot;:&quot;[1, 2, 3]&quot;},
+               &quot;terms&quot;:{&quot;R&quot;:{&quot;c&quot;:&quot;::&quot;,&quot;a&quot;:[{&quot;i&quot;:1},{&quot;c&quot;:&quot;::&quot;,&quot;a&quot;:[{&quot;i&quot;:2},{&quot;c&quot;:&quot;::&quot;,&quot;a&quot;:[{&quot;i&quot;:3},{&quot;c&quot;:&quot;[]&quot;}]}]}]}},
+               &quot;constraints&quot;:[]}],
+ &quot;exhausted&quot;:true,&quot;fuelUsed&quot;:3}</code></pre>
+<p><code>terms</code> holds the same values as trees: <code>{&quot;c&quot;:name}</code> a constant, <code>{&quot;c&quot;:name,&quot;a&quot;:[...]}</code> a constant applied, <code>{&quot;i&quot;:..}</code>, <code>{&quot;f&quot;:..}</code> and <code>{&quot;s&quot;:..}</code> literals, <code>{&quot;v&quot;:name}</code> an unassigned variable and <code>{&quot;o&quot;:printed}</code> anything else, such as a λ-term.</p>
 <p><code>exhausted</code> is <code>false</code> when a limit you set stopped the search before the last solution.</p>
 <p>Programs are immutable. Adding a clause gives you a new handle and leaves the old program as it was, which is the same persistence the Lean library offers. The handle table is safe to use from several threads.</p>
 <p>A machine needs no Lean installation. On macOS the native library is a single file with the engine and the Lean runtime linked together. On Linux the toolchain's runtime cannot be linked into a shared object, so <code>libleanelpi.so</code> comes with <code>libleanshared.so</code> beside it and finds it through an <code>$ORIGIN</code> rpath; the wheels and npm packages carry both. A wheel is about 44 MB. Starting the runtime takes about a second the first time you load a program in a process.</p>
 <h3 id="what-you-get-and-what-you-do-not">What you get, and what you do not</h3>
-<p>You get the engine, the standard library, typed clauses, modes, constraints and CHR. You do not get the Lean-facing builtins (<code>lean.*</code>, <code>{{ … }}</code>, <code>elpi_extern</code>): they need a Lean environment and stay in the Lean host. Values come back as strings, so decode them in your own code.</p>
+<p>You get the engine, the standard library, typed clauses, modes, constraints and CHR. You do not get the Lean-facing builtins (<code>lean.*</code>, <code>{{ … }}</code>, <code>elpi_extern</code>): they need a Lean environment and stay in the Lean host. Values come back as strings and, since 0.4, as JSON term trees; host predicates are answered by a C callback, which only the Rust binding wraps so far.</p>
 <h2 id="install">Install</h2>
 <table><thead><tr><th>Language</th><th>Command</th><th>Notes</th></tr></thead><tbody><tr><td>Python ≥ 3.9</td><td><code>pip install leanelpi</code></td><td>a platform wheel with the library inside (on Linux, with the Lean runtime library beside it)</td></tr><tr><td>Node.js ≥ 18</td><td><code>npm install @lean-elpi/leanelpi</code></td><td>npm picks the library for your platform; no compiler needed</td></tr><tr><td>Rust ≥ 1.70</td><td><code>cargo add leanelpi</code></td><td>needs the library separately, see below</td></tr></tbody></table>
 <p>Supported platforms: macOS (Apple silicon and Intel) and Linux (x86-64 and arm64). Windows is not supported yet.</p>
@@ -97,6 +101,26 @@ fn main() -&gt; Result&lt;(), leanelpi::Error&gt; {
     Ok(())
 }</code></pre>
 <p><code>Program</code> is <code>Send</code> and <code>Sync</code>, so an <code>Arc&lt;Program&gt;</code> can serve queries from many threads at once. Dropping a <code>Program</code> frees its handle.</p>
+<h3 id="host-predicates">Host predicates</h3>
+<p>A Rust program can answer predicates itself while a query runs, for example to let ELPI rules read facts that live in the program's own store. Declare the predicate on a program, then pass a closure to <code>solve_host</code>:</p>
+<pre><code class="language-rust">use leanelpi::{Program, Term};
+
+let p = Program::new(
+    &quot;kind node type.\ntype a, b, c node.\n\
+     pred edge i:node, o:node.\npred path i:node, o:node.\n\
+     path X Y :- edge X Y.\npath X Z :- edge X Y, path Y Z.&quot;,
+)?
+.declare(&quot;edge&quot;, &quot;pred edge i:node, o:node.&quot;)?;
+let edges = [(&quot;a&quot;, &quot;b&quot;), (&quot;b&quot;, &quot;c&quot;)];
+let run = p.solve_host(&quot;path a X&quot;, 0, 0, |_name, args| {
+    let Term::Const(from) = &amp;args[0] else { return Err(&quot;unbound source&quot;.into()) };
+    Ok(edges.iter().filter(|e| e.0 == from).map(|e| vec![Term::Const(e.1.into())]).collect())
+})?;
+for s in &amp;run.solutions {
+    println!(&quot;{:?}&quot;, s.terms[&quot;X&quot;]);                 // Const(&quot;b&quot;), Const(&quot;c&quot;)
+}</code></pre>
+<p>The closure receives the predicate's name and its arguments as <code>Term</code>s (unbound ones as <code>Term::Var</code>) and returns one row per answer, holding a term for each output-mode argument in order. An empty list is failure; <code>Err(message)</code> stops the run with an error, and so does a panic. Rows may contain constants the program knows, applications of them and literals. The closure runs on the calling thread, inside <code>solve_host</code>; all rows of one call are collected before the search goes on. A query that reaches a host predicate through plain <code>solve</code> is an error. When fuel runs out, the error's <code>is_out_of_fuel()</code> is true; a finished run reports <code>fuel_used</code>.</p>
+<p>In C the same pair is <code>leanelpi_declare</code> and <code>leanelpi_solve_host</code> with a <code>leanelpi_host_fn</code> callback, which returns a <code>malloc</code>'d JSON string, <code>{&quot;rows&quot;:[[term,...],...]}</code> or <code>{&quot;error&quot;:&quot;...&quot;}</code>, that the library frees.</p>
 <p>To ship a Rust binary, put <code>libleanelpi</code> (and, on Linux, the <code>libleanshared</code> files from the same archive) next to it and link with <code>-C link-arg=-Wl,-rpath,@executable_path</code> on macOS or <code>-Wl,-rpath,$ORIGIN</code> on Linux (for example from your own <code>build.rs</code>).</p>
 <h2 id="other-languages">Other languages</h2>
 <p>Any language with a C FFI can follow the same steps. <code>dist/leanelpi.h</code> documents the functions: call <code>leanelpi_init</code> once, then <code>leanelpi_load</code> for a handle, <code>leanelpi_solve</code> for JSON, and release every returned string with <code>leanelpi_free_string</code>. Errors come back through the <code>err</code> out-parameter.</p>
