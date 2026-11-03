@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 — 2026-10-31
+
+What Marien's tracer bullet needed from the host API (OpenSpec change `add-host-api`, requirements "Host libraries for accumulate" and "Goals parsed from text").
+
+### Added
+- Host libraries: `Host.loadUnits` and `Host.ast` take `libs`, named sources that `accumulate` resolves before the embedded libraries (a host's stored modules); `Host.ast` takes a `view` that picks the units and libraries it shows; `Host.accumulates` lists a unit's accumulated names without loading them.
+- `Host.parseGoal`: a goal written as text, with errors located in unit `<goal>`.
+- `Host.reservedNames`: the keywords and library names a host must not generate.
+
 ## 0.4.1 — 2026-10-31
 
 The first published 0.4 release. The tag `v0.4.0` was never published: its macOS arm64 build ran on the retired `macos-14` runner image, so the release workflow skipped every registry.
