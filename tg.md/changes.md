@@ -85,7 +85,7 @@ Follows the archived `optimize-engine-store`. Capability: `elpi-core-engine` (fi
 
 The host-facing Lean API (`Elpi.Host`): predicate signatures, goals built from terms, structured result terms with a proved JSON round trip, resumable fuel slices, bulk facts as terms, multi-unit loading with located errors, and a public clause AST.
 
-Depends on [[changes#add-elpi-core]]. Capability: `elpi-host-api`. Requested by Marien (its change `add-leanelpi-host-api`, capability `engine-host-api`). Files: `openspec/changes/add-host-api/`. Released in 0.4.1 together with [[changes#add-host-callbacks]].
+Depends on [[changes#add-elpi-core]]. Capability: `elpi-host-api`. Requested by Marien (its change `add-leanelpi-host-api`, capability `engine-host-api`). Files: `openspec/changes/add-host-api/`. Released in 0.4.1 together with [[changes#add-host-callbacks]]; host libraries for `accumulate`, goals parsed from text and the reserved names followed in 0.4.2.
 
 - status:: applied
 - date:: 2026-10-31

@@ -88,3 +88,29 @@ LeanElpi SHALL compile a program from an ordered list of named source units, suc
 #### Scenario: Error position inside the module
 - **WHEN** the units `signature` (200 lines) and `org-rules` are compiled and `org-rules` has a type error on line 3, column 10
 - **THEN** the error reports unit `org-rules`, line 3, column 10
+
+### Requirement: Goals parsed from text
+LeanElpi SHALL parse a goal written as text against a compiled program, for hosts that offer an untyped debug query. The goal's named variables SHALL be the solution's outputs. Parse and type errors SHALL be located in unit `<goal>` with the line and column inside the goal text.
+
+#### Scenario: Text goal with outputs
+- **WHEN** the goal `edge X, X > 1` is parsed against a program with facts `edge 1.` and `edge 2.` and solved
+- **THEN** there is one solution, binding `X` to `2`
+
+#### Scenario: Syntax error in a text goal
+- **WHEN** the goal text `edge X,, ok` is parsed
+- **THEN** it fails with an error in unit `<goal>`, line 1, at the column of the second comma
+
+### Requirement: Host libraries for accumulate
+LeanElpi SHALL let a host pass named library sources along with the units, such as modules the host stores. An `accumulate` directive SHALL resolve against these host libraries first and the embedded libraries second, load each library at most once per unit, and locate errors inside a library in that library. LeanElpi SHALL also list the names a unit accumulates without resolving them, and the clause AST SHALL let the host choose which units and host libraries it shows.
+
+#### Scenario: Stored module is accumulated
+- **WHEN** unit `org-rules` says `accumulate graph-base.` and `graph-base` is passed as a host library defining `pred edge o:int.`
+- **THEN** the program compiles and `org-rules` may call `edge`
+
+#### Scenario: Missing library is named
+- **WHEN** unit `org-rules` accumulates `graph-base` and no host or embedded library has that name
+- **THEN** compilation fails with an error located at the directive that names `graph-base`
+
+#### Scenario: Accumulated names without loading
+- **WHEN** the accumulated names of a unit with `accumulate a.` and `accumulate b.` are listed
+- **THEN** the result is `a`, `b`, and neither library is needed

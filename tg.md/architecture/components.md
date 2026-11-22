@@ -178,7 +178,7 @@ The library for ordinary Lean programs: pure lazy `Elpi.solve`, `solveIO`, `solv
 
 The stable surface for programs that embed LeanElpi as a library, behind one module. Source: `Elpi/Host.lean`, `Elpi/Host/Types.lean`, `Elpi/Host/Ast.lean`.
 
-It offers predicate signatures, multi-unit loading with located errors, goals built from terms, resumable fuel slices with structured result terms, bulk facts as terms, and a public clause AST.
+It offers predicate signatures, multi-unit loading with located errors and host libraries for `accumulate`, goals built from terms or parsed from text, resumable fuel slices with structured result terms, bulk facts as terms, a public clause AST and the names a host must not generate.
 
 - module:: Elpi.Host
 - depends_on:: [[components#Runtime API]]

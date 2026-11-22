@@ -44,26 +44,53 @@ def predSig? (p : CompiledProgram) (name : String) : Option PredSig := do
     { mode := modes[i]?.getD .o, ty := TyTerm.ofTy sc.varNames t : Arg }
   return { name, args }
 
+/-- Words a host must not use as generated identifiers: the parser's keywords and the kinds,
+constants and predicates the prelude and standard library declare. -/
+def reservedNames : Std.HashSet String :=
+  let keywords := ["accumulate", "after", "before", "chr", "constraint", "external", "i",
+    "index", "kind", "macro", "mode", "name", "namespace", "o", "pred", "rule", "shorten",
+    "type", "typeabbrev", "pi", "sigma", "is", "mod", "div", "not", "true", "fail"]
+  let base := match baseProgram with
+    | .ok p => p.sig.kinds.toList.map (·.1) ++ p.sig.consts.toList.map (·.1)
+    | .error _ => []
+  (keywords ++ base ++ (Builtins.core Id).map (·.sig.name)).foldl (init := {}) (·.insert ·)
+
 /-! ### Loading -/
 
-private def libraryFind (name : String) (_from : String) : Id (Option (String × String)) :=
-  (Std.embedded.find? (·.1 == name)).map fun (n, t) => (n, t)
+/-- Resolve an accumulated name against the host libraries first, then the embedded ones. -/
+private def libraryFind (libs : List (String × String)) (name : String) (_from : String) :
+    Id (Option (String × String)) :=
+  match libs.find? (·.1 == name) with
+  | some lib => some lib
+  | none => (Std.embedded.find? (·.1 == name)).map fun (n, t) => (n, t)
 
-/-- Parse the units in order, resolving `accumulate` against the embedded libraries. -/
-def parseUnits (units : List (String × String)) : Except Error (List Decl) := do
+/-- Parse the units in order, resolving `accumulate` against the host libraries `libs` (name ↦
+source) and then the embedded libraries. -/
+def parseUnits (units : List (String × String)) (libs : List (String × String) := []) :
+    Except Error (List Decl) := do
   let mut out : List Decl := []
   for (name, src) in units do
-    match Id.run (Elpi.loadUnits libraryFind name src) with
+    match Id.run (Elpi.loadUnits (libraryFind libs) name src) with
     | .ok ds => out := out ++ ds
     | .error e => throw (.located [Diagnostic.ofPos e.pos e.msg])
   return out
 
+/-- The names a unit accumulates, in order, without resolving them. -/
+def accumulates (name src : String) : Except Error (List String) :=
+  match Parser.parseProgram name src with
+  | .ok raw => .ok (Ast.accumulatesOf raw)
+  | .error e => .error (.located [Diagnostic.ofPos e.pos e.msg])
+
 /-- Compile an ordered list of named source units, such as a generated signature followed by a
-module, as one program. Parse and type errors are located in the unit they come from. -/
+module, as one program. `accumulate` directives resolve against the host libraries `libs`, such
+as modules stored by the host, and then the embedded libraries; each library loads at most once
+per unit. Parse and type errors are located in the unit or library they come from. -/
 -- @tg: implements:: [[openspec:elpi-host-api#Multi-unit load keeps positions]]
-def loadUnits (units : List (String × String)) : Except Error CompiledProgram := do
+-- @tg: implements:: [[openspec:elpi-host-api#Host libraries for accumulate]]
+def loadUnits (units : List (String × String)) (libs : List (String × String) := []) :
+    Except Error CompiledProgram := do
   let base ← baseProgram |>.mapError .engine
-  let ds ← parseUnits units
+  let ds ← parseUnits units libs
   match base.addDeclsAt ds with
   | .ok p => return p
   | .error (.type es) => throw (.located (es.map fun e => Diagnostic.ofPos e.pos e.msg))
@@ -72,35 +99,39 @@ def loadUnits (units : List (String × String)) : Except Error CompiledProgram :
 /-! ### Clause AST -/
 
 /-- The public clause AST of the units. They are compiled first, so the view is of a program
-that parses and type-checks; clauses of accumulated libraries are left out. -/
+that parses and type-checks. `view` picks the units and host libraries the view shows, by name
+(a host leaves out a generated signature this way); embedded libraries are always left out. -/
 -- @tg: implements:: [[openspec:elpi-host-api#Public clause AST]]
-def ast (units : List (String × String)) : Except Error Ast.Program := do
-  let p ← loadUnits units
+def ast (units : List (String × String)) (libs : List (String × String) := [])
+    (view : String → Bool := fun _ => true) : Except Error Ast.Program := do
+  let p ← loadUnits units libs
   let defined := p.definedNames
   let builtins : Std.HashSet String :=
     ((Builtins.core Id).map (·.sig.name) ++ p.extra.map (·.sig.name)).foldl (init := {})
       fun s n => if defined.contains n then s else s.insert n
-  let unitNames := units.map (·.1)
+  let shown (file : String) : Bool :=
+    (units.any (·.1 == file) || libs.any (·.1 == file)) && view file
   let mut prog : Ast.Program := {}
-  for (name, src) in units do
-    match Parser.parseProgram name src with
-    | .ok raw => prog := { prog with accumulates := prog.accumulates ++ (Ast.accumulatesOf raw).toArray }
-    | .error e => throw (.located [Diagnostic.ofPos e.pos e.msg])
-  for d in ← parseUnits units do
+  for (name, src) in units ++ libs do
+    if shown name then
+      match Parser.parseProgram name src with
+      | .ok raw => prog := { prog with accumulates := prog.accumulates ++ (Ast.accumulatesOf raw).toArray }
+      | .error e => throw (.located [Diagnostic.ofPos e.pos e.msg])
+  for d in ← parseUnits units libs do
     match d with
     | .kind names ty pos =>
-      if unitNames.contains pos.file then
+      if shown pos.file then
         prog := { prog with kinds := prog.kinds ++ (names.map (·, Typecheck.kindArity ty)).toArray }
     | .type names _ pos =>
-      if unitNames.contains pos.file then
+      if shown pos.file then
         for n in names do
           if let some sc := p.sig.consts[n]? then
             prog := { prog with types := prog.types.push (n, TyTerm.ofTy sc.varNames sc.ty) }
     | .pred name _ pos _ =>
-      if unitNames.contains pos.file then
+      if shown pos.file then
         if let some ps := predSig? p name then prog := { prog with preds := prog.preds.push ps }
     | .clause attrs t pos =>
-      if unitNames.contains pos.file then
+      if shown pos.file then
         if let some c := Ast.clauseOf builtins attrs (elimSpilling t) pos then
           prog := { prog with clauses := prog.clauses.push c }
     | _ => pure ()
@@ -162,6 +193,21 @@ def buildGoal (p : CompiledProgram) (pred : String) (args : Array GoalArg)
   | .error [] => throw (.argument pred 0 "ill-typed goal")
   | .ok _ => pure ()
   let prep ← p.prepareTm goal fuel |>.mapError .engine
+  return { env := p.env Id prep.syms, syms := prep.syms, names := prep.names, machine := prep.machine }
+
+/-- Parse a goal written as text, such as a debug query typed by a user, against the program.
+Its named variables (not `_` or `_X`) are the outputs. Parse and type errors are located in unit
+`<goal>`, with the column inside the goal text. Use `buildGoal` for goals built from values. -/
+-- @tg: implements:: [[openspec:elpi-host-api#Goals parsed from text]]
+def parseGoal (p : CompiledProgram) (text : String) (fuel : Nat := defaultFuel) :
+    Except Error Query := do
+  let t ← match Parser.parseQuery "<goal>" text with
+    | .ok t => pure t
+    | .error e => throw (.located [Diagnostic.ofPos e.pos e.msg])
+  match Typecheck.checkProgram p.sig [] (some t) p.definedNames p.typed with
+  | .error es => throw (.located (es.map fun e => Diagnostic.ofPos e.pos e.msg))
+  | .ok _ => pure ()
+  let prep ← p.prepareTm t fuel |>.mapError .engine
   return { env := p.env Id prep.syms, syms := prep.syms, names := prep.names, machine := prep.machine }
 
 /-! ### Structured solutions and fuel slices -/

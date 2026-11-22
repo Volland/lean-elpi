@@ -218,6 +218,6 @@ def solveHost (h : UInt64) (query : String) (limit fuel : UInt64) (fn ctx : USiz
 
 /-- The library version, for binding-side compatibility checks. -/
 @[export leanelpi_ffi_version]
-def version : String := "0.4.1"
+def version : String := "0.4.2"
 
 end Elpi.Ffi
