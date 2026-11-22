@@ -84,7 +84,7 @@ See [CHANGELOG.md](CHANGELOG.md) for releases and [CONTRIBUTING.md](CONTRIBUTING
 
 | You want | Read |
 |---|---|
-| λProlog from zero, for beginners | [*The Little Elpier*](https://little-elpier.org/) (book) and its [companion code](https://github.com/Volland/little-elpier) |
+| λProlog from zero, for beginners | [*The Little Elpier*](https://little-elpier.org/) (book, free PDF and EPUB; buy it on [Leanpub](https://leanpub.com/littleelpier) or [Amazon](https://www.amazon.de/dp/B0HQ13QZ2H) to support it) and its [companion code](https://github.com/Volland/little-elpier) |
 | The big picture | `tg.md/overview.md`, then `tg.md/papers/system.md` |
 | Why things are the way they are | `tg.md/decisions.md`, `tg.md/alternatives.md` |
 | Module layout and UML | `tg.md/architecture/` |
